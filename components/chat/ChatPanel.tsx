@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Plus, History, ArrowLeft, Trash2, MessageCircle, Sparkles } from "lucide-react";
+import { Plus, History, ArrowLeft, Trash2, MessageCircle, Sparkles, Globe } from "lucide-react";
 import { useChat } from "../../hooks/useChat";
 import { useChatStore } from "../../stores/chat-store";
 import { MessageBubble } from "./MessageBubble";
@@ -9,7 +9,7 @@ import { t } from "../../lib/utils/i18n";
 
 export function ChatPanel() {
   const { messages, isStreaming, pendingContext, sendMessage, cancelStream, setPendingContext, newConversation } = useChat();
-  const { conversations, activeConversation, selectConversation, deleteConversation } = useChatStore();
+  const { conversations, activeConversation, selectConversation, deleteConversation, pageContext } = useChatStore();
   const [showHistory, setShowHistory] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -82,6 +82,29 @@ export function ChatPanel() {
           </button>
         </div>
       </div>
+
+      {/* Page context indicator */}
+      {pageContext && (
+        <div style={{
+          padding: "6px 20px",
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          borderBottom: "0.5px solid var(--border-subtle)",
+          background: "var(--bg-surface)",
+        }}>
+          <Globe size={13} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
+          <span style={{
+            fontSize: 12,
+            color: "var(--text-muted)",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}>
+            {t("chat.pageContext")}: {pageContext.title || pageContext.url}
+          </span>
+        </div>
+      )}
 
       {/* Messages */}
       <div style={{ flex: 1, overflowY: "auto", padding: "20px 18px" }}>

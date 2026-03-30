@@ -12,6 +12,7 @@
   "chat.history": "Chat History",
   "chat.context": "Referenced Content",
   "chat.empty": "Start a new conversation",
+  "chat.pageContext": "Current page",
   "chat.deleteConfirm": "Delete this conversation?",
   "settings.title": "Settings",
   "settings.provider": "AI Provider",

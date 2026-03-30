@@ -98,9 +98,7 @@ export default defineContentScript({
           break;
         case "page-search:clear":
           clearSearch();
-          break;
-        case "translate:page-start":
-          // handled by translator content script
+          sendResponse({ success: true });
           break;
         case "page-content:extract":
           sendResponse(extractPageContent());
@@ -373,10 +371,10 @@ export default defineContentScript({
       }
       if (currentBlock.trim()) blocks.push(currentBlock.trim());
 
-      // Limit total size ~6000 chars
+      // Limit total size ~2000 chars to reduce AI token usage and latency
       let content = "";
       for (const b of blocks) {
-        if (content.length + b.length > 6000) break;
+        if (content.length + b.length > 2000) break;
         content += b + "\n";
       }
       return { content: content.trim() };

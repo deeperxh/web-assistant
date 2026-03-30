@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { ChatMessage, Conversation, SelectionContext } from "../lib/ai/types";
+import type { ChatMessage, Conversation, SelectionContext, PageContext } from "../lib/ai/types";
 import {
   getConversations,
   saveConversation,
@@ -14,6 +14,7 @@ interface ChatState {
   activeConversation: Conversation | null;
   isStreaming: boolean;
   pendingContext: SelectionContext | null;
+  pageContext: PageContext | null;
 
   // Actions
   loadConversations: () => Promise<void>;
@@ -21,6 +22,7 @@ interface ChatState {
   selectConversation: (id: string) => void;
   deleteConversation: (id: string) => Promise<void>;
   setPendingContext: (ctx: SelectionContext | null) => void;
+  setPageContext: (ctx: PageContext | null) => void;
   addUserMessage: (content: string) => Promise<void>;
   startStreaming: () => void;
   appendChunk: (content: string) => void;
@@ -28,11 +30,44 @@ interface ChatState {
   setStreamError: (error: string) => void;
 }
 
+// Chunk buffering: accumulate chunks and flush via rAF to avoid per-chunk re-renders
+let chunkBuffer = "";
+let flushScheduled = false;
+
+function scheduleFlush() {
+  if (flushScheduled) return;
+  flushScheduled = true;
+  requestAnimationFrame(() => {
+    flushScheduled = false;
+    const buffered = chunkBuffer;
+    if (!buffered) return;
+    chunkBuffer = "";
+
+    const state = useChatStore.getState();
+    const conv = state.activeConversation;
+    if (!conv) return;
+
+    const msgs = conv.messages;
+    const last = msgs[msgs.length - 1];
+    if (!last || last.role !== "assistant") return;
+
+    // Mutate only the last message's content, rebuild minimal objects
+    const updatedMsg = { ...last, content: last.content + buffered };
+    const updatedMessages = msgs.slice(0, -1);
+    updatedMessages.push(updatedMsg);
+    const updated = { ...conv, messages: updatedMessages, updatedAt: Date.now() };
+
+    // Only update activeConversation during streaming; conversations list synced on finish
+    useChatStore.setState({ activeConversation: updated });
+  });
+}
+
 export const useChatStore = create<ChatState>((set, get) => ({
   conversations: [],
   activeConversation: null,
   isStreaming: false,
   pendingContext: null,
+  pageContext: null,
 
   loadConversations: async () => {
     const conversations = await getConversations();
@@ -82,6 +117,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   setPendingContext: (ctx) => set({ pendingContext: ctx }),
+  setPageContext: (ctx) => set({ pageContext: ctx }),
 
   addUserMessage: async (content) => {
     let conv = get().activeConversation;
@@ -143,30 +179,40 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   appendChunk: (content) => {
-    const conv = get().activeConversation;
-    if (!conv) return;
-
-    const messages = [...conv.messages];
-    const last = messages[messages.length - 1];
-    if (last && last.role === "assistant") {
-      messages[messages.length - 1] = { ...last, content: last.content + content };
-    }
-
-    const updated = { ...conv, messages, updatedAt: Date.now() };
-    set((s) => ({
-      activeConversation: updated,
-      conversations: s.conversations.map((c) =>
-        c.id === updated.id ? updated : c,
-      ),
-    }));
+    chunkBuffer += content;
+    scheduleFlush();
   },
 
   finishStreaming: () => {
+    // Flush any remaining buffered chunks synchronously
+    if (chunkBuffer) {
+      const buffered = chunkBuffer;
+      chunkBuffer = "";
+      const conv = get().activeConversation;
+      if (conv) {
+        const msgs = conv.messages;
+        const last = msgs[msgs.length - 1];
+        if (last && last.role === "assistant") {
+          const updatedMsg = { ...last, content: last.content + buffered };
+          const updatedMessages = msgs.slice(0, -1);
+          updatedMessages.push(updatedMsg);
+          const updated = { ...conv, messages: updatedMessages, updatedAt: Date.now() };
+          set({ activeConversation: updated });
+        }
+      }
+    }
+
     const conv = get().activeConversation;
     if (conv) {
       saveConversation(conv);
     }
-    set({ isStreaming: false });
+    // Sync conversations list (deferred from chunk updates) and clear streaming flag
+    set((s) => ({
+      isStreaming: false,
+      conversations: s.conversations.map((c) =>
+        c.id === conv?.id ? conv : c,
+      ),
+    }));
   },
 
   setStreamError: (error) => {

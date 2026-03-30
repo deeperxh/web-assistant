@@ -7,6 +7,7 @@ export default defineContentScript({
     let hoverTimeout: ReturnType<typeof setTimeout> | null = null;
     let isPageTranslated = false;
     const translatedNodes: HTMLElement[] = [];
+    const translationCache = new Map<string, string>();
 
     // Load settings
     chrome.storage.local.get("wa_translation_settings", (result) => {
@@ -120,10 +121,52 @@ export default defineContentScript({
 
     const SKIP_TAGS = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "CODE", "PRE", "TEXTAREA", "INPUT", "SVG"]);
     const BLOCK_TAGS = new Set(["P", "DIV", "LI", "TD", "TH", "H1", "H2", "H3", "H4", "H5", "H6", "BLOCKQUOTE", "ARTICLE", "SECTION", "DT", "DD", "FIGCAPTION", "SUMMARY"]);
+    const HEADING_TAGS = new Set(["H1", "H2", "H3", "H4", "H5", "H6"]);
 
     interface TextBlock {
       element: HTMLElement;
       originalText: string;
+    }
+
+    function normalizeWhitespace(text: string): string {
+      return text.replace(/\s+/g, " ").trim();
+    }
+
+    /** Extract visible text, stripping script/style/hidden elements */
+    function getCleanText(el: HTMLElement): string {
+      const clone = el.cloneNode(true) as HTMLElement;
+      clone.querySelectorAll("script, style, noscript, code, pre, textarea, input, svg, template").forEach((c) => c.remove());
+      return normalizeWhitespace(clone.textContent || "");
+    }
+
+    /** Detect word-wrapper pattern: all children are short-text block elements */
+    function isWordWrapperContainer(el: HTMLElement): boolean {
+      const children = el.children;
+      if (children.length < 2) return false;
+
+      for (let i = 0; i < children.length; i++) {
+        const child = children[i] as HTMLElement;
+        if (!BLOCK_TAGS.has(child.tagName)) return false;
+        const text = (child.textContent || "").trim();
+        if (!text || text.length > 50) return false;
+      }
+
+      // Ensure no significant direct text nodes (only whitespace between children)
+      let directText = "";
+      for (const node of el.childNodes) {
+        if (node.nodeType === Node.TEXT_NODE) {
+          directText += (node.textContent || "").trim();
+        }
+      }
+      return directText.length <= 5;
+    }
+
+    /** Mark all block-level descendants as seen to prevent duplicate translation */
+    function markDescendants(el: HTMLElement, seen: Set<HTMLElement>) {
+      const selector = Array.from(BLOCK_TAGS).join(",");
+      for (const d of el.querySelectorAll(selector)) {
+        seen.add(d as HTMLElement);
+      }
     }
 
     function collectTextBlocks(): TextBlock[] {
@@ -144,13 +187,34 @@ export default defineContentScript({
       while ((node = walker.nextNode())) {
         const el = node as HTMLElement;
         if (!BLOCK_TAGS.has(el.tagName)) continue;
-
-        // Get direct text content (skip if mostly child elements)
-        const text = getDirectText(el).trim();
-        if (!text || text.length < 2) continue;
         if (seen.has(el)) continue;
-        seen.add(el);
 
+        // Priority 1: Headings — always translate as a single unit
+        if (HEADING_TAGS.has(el.tagName)) {
+          const text = getCleanText(el);
+          if (text && text.length >= 2) {
+            seen.add(el);
+            markDescendants(el, seen);
+            blocks.push({ element: el, originalText: text });
+          }
+          continue;
+        }
+
+        // Priority 2: Word-wrapper containers — merge short-text block children
+        if (isWordWrapperContainer(el)) {
+          const text = getCleanText(el);
+          if (text && text.length >= 2) {
+            seen.add(el);
+            markDescendants(el, seen);
+            blocks.push({ element: el, originalText: text });
+          }
+          continue;
+        }
+
+        // Priority 3: Regular blocks — use direct text only
+        const text = normalizeWhitespace(getDirectText(el));
+        if (!text || text.length < 2) continue;
+        seen.add(el);
         blocks.push({ element: el, originalText: text });
       }
 
@@ -160,16 +224,21 @@ export default defineContentScript({
     function getDirectText(el: HTMLElement): string {
       // Get visible text, including inline children but not block children
       const clone = el.cloneNode(true) as HTMLElement;
-      // Remove block-level children from clone
-      clone.querySelectorAll("div, p, ul, ol, li, h1, h2, h3, h4, h5, h6, blockquote, table, pre, article, section").forEach((c) => c.remove());
-      return clone.textContent || "";
+      // Remove block-level children and non-visible elements from clone
+      clone.querySelectorAll("div, p, ul, ol, li, h1, h2, h3, h4, h5, h6, blockquote, table, pre, article, section, script, style, noscript, svg, template").forEach((c) => c.remove());
+      return normalizeWhitespace(clone.textContent || "");
     }
 
     async function translatePage(targetLang: string) {
       if (isPageTranslated) restorePage();
 
       const blocks = collectTextBlocks();
-      if (blocks.length === 0) return;
+      if (blocks.length === 0) {
+        try {
+          chrome.runtime.sendMessage({ type: "translate:page-done" });
+        } catch { /* ignore */ }
+        return;
+      }
 
       // Report progress to sidepanel
       const totalBlocks = blocks.length;
@@ -186,48 +255,69 @@ export default defineContentScript({
 
       reportProgress();
 
-      // Translate in batches of 20
+      // Translate in batches of 20, using cache when available
       const batchSize = 20;
       for (let i = 0; i < blocks.length; i += batchSize) {
         const batch = blocks.slice(i, i + batchSize);
-        const texts = batch.map((b) => b.originalText);
 
-        try {
-          const response: { translations: string[] } = await new Promise((resolve) => {
-            chrome.runtime.sendMessage(
-              { type: "translate:page-batch", data: { texts, from: "auto", to: targetLang } },
-              (r) => resolve(r || { translations: [] }),
-            );
-          });
+        // Split into cached and uncached
+        const uncachedIndices: number[] = [];
+        const uncachedTexts: string[] = [];
+        const results: string[] = new Array(batch.length).fill("");
 
-          for (let j = 0; j < batch.length; j++) {
-            const tr = response.translations[j];
-            if (!tr || tr === batch[j].originalText) continue;
-
-            // Insert bilingual translation below original
-            const translatedEl = document.createElement("div");
-            translatedEl.setAttribute("data-wa-translated", "true");
-            translatedEl.style.cssText = `
-              color: #0a84ff;
-              font-size: 0.92em;
-              line-height: 1.6;
-              margin-top: 4px;
-              padding: 2px 0;
-              border-left: 2px solid rgba(10, 132, 255, 0.3);
-              padding-left: 8px;
-            `;
-            translatedEl.textContent = tr;
-
-            batch[j].element.after(translatedEl);
-            translatedNodes.push(translatedEl);
+        for (let j = 0; j < batch.length; j++) {
+          const cached = translationCache.get(batch[j].originalText);
+          if (cached) {
+            results[j] = cached;
+          } else {
+            uncachedIndices.push(j);
+            uncachedTexts.push(batch[j].originalText);
           }
-
-          translated += batch.length;
-          reportProgress();
-        } catch {
-          translated += batch.length;
-          reportProgress();
         }
+
+        // Only call API for uncached texts
+        if (uncachedTexts.length > 0) {
+          try {
+            const response: { translations: string[] } = await new Promise((resolve) => {
+              chrome.runtime.sendMessage(
+                { type: "translate:page-batch", data: { texts: uncachedTexts, from: "auto", to: targetLang } },
+                (r) => resolve(r || { translations: [] }),
+              );
+            });
+            for (let k = 0; k < uncachedIndices.length; k++) {
+              const tr = response.translations[k] || "";
+              results[uncachedIndices[k]] = tr;
+              if (tr) translationCache.set(batch[uncachedIndices[k]].originalText, tr);
+            }
+          } catch {
+            // API failed, cached results still available
+          }
+        }
+
+        // Insert translations into DOM
+        for (let j = 0; j < batch.length; j++) {
+          const tr = results[j];
+          if (!tr || tr === batch[j].originalText) continue;
+
+          const translatedEl = document.createElement("div");
+          translatedEl.setAttribute("data-wa-translated", "true");
+          translatedEl.style.cssText = `
+            color: #0a84ff;
+            font-size: 0.92em;
+            line-height: 1.6;
+            margin-top: 4px;
+            padding: 2px 0;
+            border-left: 2px solid rgba(10, 132, 255, 0.3);
+            padding-left: 8px;
+          `;
+          translatedEl.textContent = tr;
+
+          batch[j].element.after(translatedEl);
+          translatedNodes.push(translatedEl);
+        }
+
+        translated += batch.length;
+        reportProgress();
       }
 
       isPageTranslated = true;

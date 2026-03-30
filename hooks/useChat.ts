@@ -36,9 +36,34 @@ export function useChat() {
       if (!conv) return;
 
       // Build messages for API
-      const apiMessages = conv.messages
-        .filter((m) => m.role !== "system")
-        .map((m) => ({ role: m.role, content: m.content }));
+      const { pageContext } = useChatStore.getState();
+      const apiMessages: { role: string; content: string }[] = [];
+
+      if (pageContext) {
+        const systemContent = [
+          "You are a helpful AI web assistant embedded in a browser extension.",
+          "The user is currently viewing:\n",
+          `URL: ${pageContext.url}`,
+          `Title: ${pageContext.title}`,
+        ];
+        if (pageContext.content) {
+          systemContent.push(
+            "\n--- Page Content ---",
+            pageContext.content,
+            "--- End ---",
+          );
+        }
+        systemContent.push(
+          "\nUse this page context to answer questions about the page when relevant. If the user's question is not about the page, answer normally.",
+        );
+        apiMessages.push({ role: "system", content: systemContent.join("\n") });
+      }
+
+      apiMessages.push(
+        ...conv.messages
+          .filter((m) => m.role !== "system")
+          .map((m) => ({ role: m.role, content: m.content })),
+      );
 
       // Open port to background
       const port = chrome.runtime.connect({ name: "ai-chat" });

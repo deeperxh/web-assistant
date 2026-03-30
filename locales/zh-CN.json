@@ -12,6 +12,7 @@
   "chat.history": "历史对话",
   "chat.context": "引用内容",
   "chat.empty": "开始一段新对话吧",
+  "chat.pageContext": "当前页面",
   "chat.deleteConfirm": "确定删除这个对话吗？",
   "settings.title": "设置",
   "settings.provider": "AI 服务商",

@@ -51,15 +51,13 @@ export async function googleTranslateBatch(
 }
 
 async function translateChunk(text: string, sl: string, tl: string): Promise<string> {
-  const params = new URLSearchParams({
-    client: "gtx",
-    sl,
-    tl,
-    dt: "t",
-    q: text,
-  });
+  const urlParams = new URLSearchParams({ client: "gtx", sl, tl, dt: "t" });
 
-  const resp = await fetch(`${API_URL}?${params}`);
+  const resp = await fetch(`${API_URL}?${urlParams}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ q: text }),
+  });
   if (!resp.ok) {
     throw new Error(`Google Translate HTTP ${resp.status}`);
   }

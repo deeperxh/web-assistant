@@ -47,17 +47,33 @@ export class AnthropicCompatibleProvider implements AIProvider {
       url = `${baseUrl}/v1/messages`;
     }
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": config.apiKey || "",
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true",
-      },
-      body: JSON.stringify(body),
-      signal: params.signal,
-    });
+    // Combine user abort signal with a 30s timeout
+    const timeout = AbortSignal.timeout(30000);
+    const signal = params.signal
+      ? AbortSignal.any([params.signal, timeout])
+      : timeout;
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": (config.apiKey || "").replace(/[^\x20-\x7E]/g, ""),
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+        body: JSON.stringify(body),
+        signal,
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("abort") || msg.includes("Abort")) {
+        throw err; // let caller handle abort
+      }
+      yield { type: "error", error: `Network error: ${msg} (URL: ${url})` };
+      return;
+    }
 
     if (!response.ok) {
       const text = await response.text().catch(() => "");

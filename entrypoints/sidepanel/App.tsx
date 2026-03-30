@@ -13,6 +13,7 @@ import { NotesPanel } from "../../components/notes/NotesPanel";
 import { SettingsPanel } from "../../components/settings/SettingsPanel";
 import { TranslationBar } from "../../components/translation/TranslationBar";
 import { useChatStore } from "../../stores/chat-store";
+import { usePageContext } from "../../hooks/usePageContext";
 
 type Tab = "chat" | "search" | "bookmarks" | "notes" | "settings";
 
@@ -27,6 +28,7 @@ const tabs: { id: Tab; icon: typeof MessageCircle; label: string }[] = [
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>("chat");
   const loadConversations = useChatStore((s) => s.loadConversations);
+  usePageContext();
 
   useEffect(() => {
     loadConversations();

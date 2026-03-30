@@ -30,22 +30,37 @@ export class OpenAICompatibleProvider implements AIProvider {
     const baseUrl = config.baseUrl || this.defaultBaseUrl;
     const url = `${baseUrl.replace(/\/$/, "")}/v1/chat/completions`;
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${config.apiKey}`,
-        ...this.extraHeaders,
-      },
-      body: JSON.stringify({
-        model: params.model,
-        messages: params.messages,
-        temperature: params.temperature ?? 0.7,
-        max_tokens: params.maxTokens,
-        stream: true,
-      }),
-      signal: params.signal,
-    });
+    const timeout = AbortSignal.timeout(30000);
+    const signal = params.signal
+      ? AbortSignal.any([params.signal, timeout])
+      : timeout;
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${(config.apiKey || "").replace(/[^\x20-\x7E]/g, "")}`,
+          ...this.extraHeaders,
+        },
+        body: JSON.stringify({
+          model: params.model,
+          messages: params.messages,
+          temperature: params.temperature ?? 0.7,
+          max_tokens: params.maxTokens,
+          stream: true,
+        }),
+        signal,
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("abort") || msg.includes("Abort")) {
+        throw err;
+      }
+      yield { type: "error", error: `Network error: ${msg} (URL: ${url})` };
+      return;
+    }
 
     if (!response.ok) {
       const text = await response.text().catch(() => "");

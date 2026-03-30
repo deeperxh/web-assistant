@@ -7,6 +7,7 @@ export function TranslationBar() {
   const [translating, setTranslating] = useState(false);
   const [translated, setTranslated] = useState(false);
   const [progress, setProgress] = useState<{ translated: number; total: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const handler = (message: any) => {
@@ -25,6 +26,7 @@ export function TranslationBar() {
   const handleTranslate = useCallback(async () => {
     setTranslating(true);
     setProgress(null);
+    setError(null);
 
     const settings = await getAISettings();
     const targetLang = settings.translationTargetLang || "zh-CN";
@@ -37,6 +39,12 @@ export function TranslationBar() {
       data: { targetLang },
     }, () => {
       if (chrome.runtime.lastError) {
+        const msg = chrome.runtime.lastError.message || "";
+        if (msg.includes("Receiving end does not exist") || msg.includes("Could not establish connection")) {
+          setError("请先刷新页面");
+        } else {
+          setError(msg || "发送失败");
+        }
         setTranslating(false);
       }
     });
@@ -71,30 +79,35 @@ export function TranslationBar() {
   }
 
   return (
-    <button
-      onClick={handleTranslate}
-      disabled={translating}
-      style={{
-        display: "flex", alignItems: "center", gap: 6,
-        padding: "6px 12px", borderRadius: 10,
-        border: "1px solid var(--border-default)",
-        background: "transparent", color: "var(--text-body)",
-        fontSize: 12, fontWeight: 600, cursor: translating ? "not-allowed" : "pointer",
-        opacity: translating ? 0.7 : 1,
-        transition: "all 0.15s",
-      }}
-    >
-      {translating ? (
-        <>
-          <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} />
-          {progress ? `${progress.translated}/${progress.total}` : t("translation.translating")}
-        </>
-      ) : (
-        <>
-          <Languages size={14} />
-          {t("translation.translatePage")}
-        </>
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <button
+        onClick={handleTranslate}
+        disabled={translating}
+        style={{
+          display: "flex", alignItems: "center", gap: 6,
+          padding: "6px 12px", borderRadius: 10,
+          border: "1px solid var(--border-default)",
+          background: "transparent", color: "var(--text-body)",
+          fontSize: 12, fontWeight: 600, cursor: translating ? "not-allowed" : "pointer",
+          opacity: translating ? 0.7 : 1,
+          transition: "all 0.15s",
+        }}
+      >
+        {translating ? (
+          <>
+            <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} />
+            {progress ? `${progress.translated}/${progress.total}` : t("translation.translating")}
+          </>
+        ) : (
+          <>
+            <Languages size={14} />
+            {t("translation.translatePage")}
+          </>
+        )}
+      </button>
+      {error && (
+        <span style={{ fontSize: 11, color: "#ef4444" }}>{error}</span>
       )}
-    </button>
+    </div>
   );
 }

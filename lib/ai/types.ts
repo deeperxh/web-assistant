@@ -23,6 +23,12 @@ export interface SelectionContext {
   title: string;
 }
 
+export interface PageContext {
+  url: string;
+  title: string;
+  content: string;
+}
+
 export interface ChatParams {
   model: string;
   messages: { role: string; content: string }[];
