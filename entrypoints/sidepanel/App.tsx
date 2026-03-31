@@ -6,21 +6,24 @@ import {
   FileText,
   Settings,
   Plus,
+  Crosshair,
 } from "lucide-react";
 import { ChatPanel } from "../../components/chat/ChatPanel";
 import { SearchPanel } from "../../components/search/SearchPanel";
 import { BookmarksPanel } from "../../components/bookmarks/BookmarksPanel";
 import { NotesPanel } from "../../components/notes/NotesPanel";
 import { SettingsPanel } from "../../components/settings/SettingsPanel";
+import { PickerPanel } from "../../components/picker/PickerPanel";
 import { TranslationBar } from "../../components/translation/TranslationBar";
 import { useChatStore } from "../../stores/chat-store";
 import { usePageContext } from "../../hooks/usePageContext";
 
-type Tab = "chat" | "search" | "bookmarks" | "notes" | "settings";
+type Tab = "chat" | "search" | "bookmarks" | "notes" | "picker" | "settings";
 
 const tabs: { id: Tab; icon: typeof MessageCircle; label: string }[] = [
   { id: "chat", icon: MessageCircle, label: "对话" },
   { id: "search", icon: Search, label: "搜索" },
+  { id: "picker", icon: Crosshair, label: "选取" },
   { id: "bookmarks", icon: Bookmark, label: "书签" },
   { id: "notes", icon: FileText, label: "笔记" },
   { id: "settings", icon: Settings, label: "设置" },
@@ -39,6 +42,9 @@ export default function App() {
         setActiveTab("chat");
         chrome.storage.session.remove("wa_pending_context");
       }
+      if (changes.wa_pending_element?.newValue) {
+        setActiveTab("picker");
+      }
     };
     chrome.storage.session.onChanged.addListener(handler);
     return () => chrome.storage.session.onChanged.removeListener(handler);
@@ -51,6 +57,7 @@ export default function App() {
         {activeTab === "search" && <SearchPanel />}
         {activeTab === "bookmarks" && <BookmarksPanel />}
         {activeTab === "notes" && <NotesPanel />}
+        {activeTab === "picker" && <PickerPanel />}
         {activeTab === "settings" && <SettingsPanel />}
       </div>
 

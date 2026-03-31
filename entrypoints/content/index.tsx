@@ -1,4 +1,12 @@
 import "./style.css";
+import type { ElementInfo } from "../../lib/element-picker/types";
+import {
+  generateCssSelector,
+  generateXPath,
+  generateParentChain,
+  extractSiblings,
+  extractKeyAttributes,
+} from "../../lib/element-picker/selector-generator";
 
 export default defineContentScript({
   matches: ["<all_urls>"],
@@ -105,6 +113,14 @@ export default defineContentScript({
           break;
         case "page-search:find-snippets":
           sendResponse(findSnippetsInPage(message.data.snippets));
+          break;
+        case "picker:start":
+          startPicker();
+          sendResponse({ success: true });
+          break;
+        case "picker:cancel":
+          stopPicker();
+          sendResponse({ success: true });
           break;
       }
       return false;
@@ -437,6 +453,133 @@ export default defineContentScript({
 
     function escapeRegex(s: string): string {
       return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+
+    // ---- Element Picker ----
+    let pickerActive = false;
+    let pickerOverlay: HTMLElement | null = null;
+    let currentHoveredElement: Element | null = null;
+    let rafId = 0;
+
+    function startPicker() {
+      if (pickerActive) return;
+      pickerActive = true;
+
+      // Create highlight overlay
+      pickerOverlay = document.createElement("div");
+      pickerOverlay.setAttribute("data-wa-ui", "true");
+      pickerOverlay.style.cssText = `
+        position: fixed;
+        pointer-events: none;
+        border: 2px solid #0a84ff;
+        background: rgba(10, 132, 255, 0.08);
+        border-radius: 3px;
+        z-index: 2147483647;
+        transition: top 0.08s ease, left 0.08s ease, width 0.08s ease, height 0.08s ease;
+        display: none;
+      `;
+      document.body.appendChild(pickerOverlay);
+
+      document.body.style.cursor = "crosshair";
+      document.addEventListener("mousemove", onPickerMouseMove, true);
+      document.addEventListener("click", onPickerClick, true);
+      document.addEventListener("keydown", onPickerKeyDown, true);
+    }
+
+    function stopPicker() {
+      if (!pickerActive) return;
+      pickerActive = false;
+      cancelAnimationFrame(rafId);
+
+      if (pickerOverlay) {
+        pickerOverlay.remove();
+        pickerOverlay = null;
+      }
+      currentHoveredElement = null;
+      document.body.style.cursor = "";
+      document.removeEventListener("mousemove", onPickerMouseMove, true);
+      document.removeEventListener("click", onPickerClick, true);
+      document.removeEventListener("keydown", onPickerKeyDown, true);
+    }
+
+    function onPickerMouseMove(e: MouseEvent) {
+      if (!pickerActive) return;
+      const target = e.target as Element;
+      if (target.closest("[data-wa-ui]")) return;
+      if (target === currentHoveredElement) return;
+
+      currentHoveredElement = target;
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        if (!pickerOverlay || !currentHoveredElement) return;
+        const rect = currentHoveredElement.getBoundingClientRect();
+        pickerOverlay.style.top = `${rect.top}px`;
+        pickerOverlay.style.left = `${rect.left}px`;
+        pickerOverlay.style.width = `${rect.width}px`;
+        pickerOverlay.style.height = `${rect.height}px`;
+        pickerOverlay.style.display = "block";
+      });
+    }
+
+    function onPickerClick(e: MouseEvent) {
+      if (!pickerActive) return;
+      const target = e.target as Element;
+      if (target.closest("[data-wa-ui]")) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+
+      const el = currentHoveredElement || target;
+      const info = extractElementInfo(el);
+      stopPicker();
+      safeSendMessage({ type: "picker:element-selected", data: { elementInfo: info } });
+    }
+
+    function onPickerKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        stopPicker();
+      }
+    }
+
+    function extractElementInfo(el: Element): ElementInfo {
+      const computed = window.getComputedStyle(el);
+      const rect = el.getBoundingClientRect();
+
+      return {
+        selector: generateCssSelector(el),
+        xpath: generateXPath(el),
+        tagName: el.tagName.toLowerCase(),
+        id: el.id || "",
+        classes: Array.from(el.classList),
+        textContent: (el.textContent || "").trim().slice(0, 100),
+        parentChain: generateParentChain(el),
+        boundingBox: {
+          x: Math.round(rect.x),
+          y: Math.round(rect.y),
+          width: Math.round(rect.width),
+          height: Math.round(rect.height),
+        },
+        styles: {
+          padding: computed.padding,
+          margin: computed.margin,
+          width: computed.width,
+          height: computed.height,
+          fontSize: computed.fontSize,
+          fontWeight: computed.fontWeight,
+          color: computed.color,
+          backgroundColor: computed.backgroundColor,
+          border: computed.border,
+          borderRadius: computed.borderRadius,
+          display: computed.display,
+          position: computed.position,
+          lineHeight: computed.lineHeight,
+          gap: computed.gap,
+        },
+        siblings: extractSiblings(el),
+        attributes: extractKeyAttributes(el),
+      };
     }
   },
 });

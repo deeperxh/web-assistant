@@ -35,6 +35,14 @@ export function setupMessageHandlers() {
       case "note:clip":
         handleClipNote(data);
         break;
+
+      case "picker:element-selected":
+        chrome.storage.session.set({ wa_pending_element: data.elementInfo });
+        if (sender.tab?.id) {
+          chrome.sidePanel.open({ tabId: sender.tab.id }).catch(() => {});
+        }
+        sendResponse({ success: true });
+        break;
     }
   });
 }

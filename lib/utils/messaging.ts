@@ -1,4 +1,5 @@
 import type { SelectionContext } from "../ai/types";
+import type { ElementInfo } from "../element-picker/types";
 
 // Message types for communication between extension components
 export interface MessageMap {
@@ -18,6 +19,11 @@ export interface MessageMap {
   "translate:page-start": { targetLang: string };
   "page-search:results": { count: number; current: number };
   "selection:request": undefined;
+
+  // Element Picker
+  "picker:start": undefined;
+  "picker:cancel": undefined;
+  "picker:element-selected": { elementInfo: ElementInfo };
 
   // Side panel -> Background
   "ai:chat": {
