@@ -55,6 +55,7 @@ export function ChatInput({ onSend, onStop, isStreaming }: Props) {
           onChange={handleInput}
           onKeyDown={handleKeyDown}
           placeholder={t("chat.placeholder")}
+          aria-label={t("aria.chatInput")}
           rows={1}
           style={{
             flex: 1,
@@ -76,10 +77,11 @@ export function ChatInput({ onSend, onStop, isStreaming }: Props) {
             style={{
               width: 36, height: 36, borderRadius: "50%",
               display: "flex", alignItems: "center", justifyContent: "center",
-              background: "var(--red)", color: "#fff",
+              background: "var(--red)", color: "var(--bubble-user-text)",
               border: "none", cursor: "pointer", flexShrink: 0,
             }}
             title={t("chat.stop")}
+            aria-label={t("chat.stop")}
           >
             <Square size={14} fill="currentColor" />
           </button>
@@ -91,11 +93,12 @@ export function ChatInput({ onSend, onStop, isStreaming }: Props) {
               width: 36, height: 36, borderRadius: "50%",
               display: "flex", alignItems: "center", justifyContent: "center",
               background: ok ? "var(--tint)" : "var(--bg-sunken)",
-              color: ok ? "#fff" : "var(--text-muted)",
+              color: ok ? "var(--bubble-user-text)" : "var(--text-muted)",
               border: "none", cursor: ok ? "pointer" : "default", flexShrink: 0,
               transition: "all 0.15s",
             }}
             title={t("chat.send")}
+            aria-label={t("chat.send")}
           >
             <ArrowUp size={18} strokeWidth={2.5} />
           </button>

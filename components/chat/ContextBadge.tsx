@@ -24,7 +24,7 @@ export function ContextBadge({ context, onDismiss }: Props) {
             {context.text.slice(0, 160)}{context.text.length > 160 ? "…" : ""}
           </div>
         </div>
-        <button onClick={onDismiss} className="btn-ghost" style={{ padding: 4, color: "var(--tint)" }}>
+        <button onClick={onDismiss} className="btn-ghost" style={{ padding: 4, color: "var(--tint)" }} aria-label={t("aria.dismissContext")}>
           <X size={15} />
         </button>
       </div>

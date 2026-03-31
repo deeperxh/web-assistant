@@ -25,10 +25,10 @@ export function NotesPanel() {
     return (
       <div style={{ display: "flex", flexDirection: "column", height: "100%" }} className="anim-in">
         <div className="frosted-bar" style={{ padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <button onClick={() => { setEditing(null); load(); }} className="btn-ghost" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 500, padding: "6px 8px" }}>
-            <ArrowLeft size={18} /> 返回
+          <button onClick={() => { setEditing(null); load(); }} className="btn-ghost" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 500, padding: "6px 8px" }} aria-label={t("aria.backToNotes")}>
+            <ArrowLeft size={18} /> {t("notes.back")}
           </button>
-          <button onClick={handleSave} className="btn-tint" style={{ fontSize: 13, padding: "7px 14px", gap: 5 }}>
+          <button onClick={handleSave} className="btn-tint" style={{ fontSize: 13, padding: "7px 14px", gap: 5 }} aria-label={t("notes.save")}>
             <Save size={14} /> {t("notes.save")}
           </button>
         </div>
@@ -49,9 +49,10 @@ export function NotesPanel() {
         <textarea
           value={content} onChange={(e) => setContent(e.target.value)}
           placeholder={t("notes.placeholder")} autoFocus
+          aria-label={t("aria.noteInput")}
           style={{ flex: 1, resize: "none", background: "transparent", border: "none", outline: "none", padding: "16px 22px", fontSize: 15, lineHeight: 1.8, color: "var(--text-strong)" }}
         />
-        <div style={{ padding: "8px 22px 14px", fontSize: 12, color: "var(--text-muted)" }}>{content.length} 字符</div>
+        <div style={{ padding: "8px 22px 14px", fontSize: 12, color: "var(--text-muted)" }}>{t("notes.charCount", { count: String(content.length) })}</div>
       </div>
     );
   }
@@ -64,13 +65,13 @@ export function NotesPanel() {
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <div className="frosted-bar" style={{ padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontWeight: 600, fontSize: 16 }}>{t("notes.title")}</span>
-        <button onClick={handleNew} className="btn-tint" style={{ fontSize: 13, padding: "7px 14px", gap: 5 }}>
+        <button onClick={handleNew} className="btn-tint" style={{ fontSize: 13, padding: "7px 14px", gap: 5 }} aria-label={t("notes.add")}>
           <Plus size={15} /> {t("notes.add")}
         </button>
       </div>
 
       <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 10 }}>
           {all.length === 0 && (
             <div className="anim-in" style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "48px 0", gap: 12 }}>
               <div style={{ padding: 16, borderRadius: 18, background: "var(--bg-sunken)" }}><FileText size={28} style={{ color: "var(--text-muted)" }} /></div>
@@ -78,10 +79,10 @@ export function NotesPanel() {
             </div>
           )}
           {all.map((n, i) => (
-            <div key={n.id} className="tile anim-in" style={{ cursor: "pointer", animationDelay: `${i * 20}ms` }} onClick={() => { setEditing(n); setContent(n.content); }}>
+            <li key={n.id} className="tile anim-in" style={{ cursor: "pointer", animationDelay: `${Math.min(i * 20, 500)}ms` }} onClick={() => { setEditing(n); setContent(n.content); }}>
               {n.isPinned && (
                 <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: "var(--tint)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.03em" }}>
-                  <Pin size={11} /> 已置顶
+                  <Pin size={11} /> {t("notes.pinned")}
                 </div>
               )}
               <div style={{ fontSize: 14, lineHeight: 1.6, color: n.content ? "var(--text-strong)" : "var(--text-muted)", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
@@ -98,13 +99,13 @@ export function NotesPanel() {
                   <span style={{ fontSize: 12, color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>{new Date(n.updatedAt).toLocaleDateString()}</span>
                 </div>
                 <div style={{ display: "flex", gap: 2, flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
-                  <button onClick={() => handlePin(n)} className="btn-ghost" style={{ padding: 5, color: n.isPinned ? "var(--tint)" : "var(--text-muted)" }}><Pin size={14} /></button>
-                  <button onClick={() => handleDelete(n.id)} className="btn-ghost" style={{ padding: 5, color: "var(--red)" }}><Trash2 size={14} /></button>
+                  <button onClick={() => handlePin(n)} className="btn-ghost" style={{ padding: 5, color: n.isPinned ? "var(--tint)" : "var(--text-muted)" }} aria-label={n.isPinned ? t("aria.unpinNote") : t("aria.pinNote")}><Pin size={14} /></button>
+                  <button onClick={() => handleDelete(n.id)} className="btn-ghost" style={{ padding: 5, color: "var(--red)" }} aria-label={t("aria.deleteNote")}><Trash2 size={14} /></button>
                 </div>
               </div>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
     </div>
   );

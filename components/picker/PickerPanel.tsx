@@ -86,12 +86,13 @@ export function PickerPanel() {
           <button
             onClick={picking ? handleCancelPicker : handleStartPicker}
             className="btn-tint"
+            aria-label={picking ? t("aria.cancelPicker") : t("picker.start")}
             style={{
               display: "flex", alignItems: "center", gap: 6,
               padding: "7px 14px", borderRadius: 10, border: "none",
               fontSize: 13, fontWeight: 600, cursor: "pointer",
               background: picking ? "var(--red-soft)" : "var(--tint)",
-              color: picking ? "var(--red)" : "#fff",
+              color: picking ? "var(--red)" : "var(--bubble-user-text)",
               transition: "all 0.15s",
             }}
           >
@@ -101,6 +102,7 @@ export function PickerPanel() {
         ) : (
           <button
             onClick={handleReset}
+            aria-label={t("aria.resetPicker")}
             style={{
               display: "flex", alignItems: "center", gap: 6,
               padding: "7px 14px", borderRadius: 10,
@@ -134,7 +136,7 @@ export function PickerPanel() {
               {t("picker.emptyHint")}
             </span>
             {error && (
-              <div style={{
+              <div role="alert" style={{
                 marginTop: 8, padding: "8px 14px", borderRadius: 10,
                 background: "var(--red-soft)", color: "var(--red)",
                 fontSize: 13, fontWeight: 500,
@@ -223,6 +225,7 @@ export function PickerPanel() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder={t("picker.description")}
+                aria-label={t("aria.descriptionInput")}
                 rows={3}
                 style={{
                   width: "100%", padding: "10px 14px", borderRadius: 12,
@@ -237,10 +240,11 @@ export function PickerPanel() {
             {/* Generate button */}
             <button
               onClick={handleGenerate}
+              aria-label={t("picker.generate")}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                 width: "100%", padding: "11px 0", borderRadius: 12, border: "none",
-                background: "var(--tint)", color: "#fff",
+                background: "var(--tint)", color: "var(--bubble-user-text)",
                 fontSize: 14, fontWeight: 600, cursor: "pointer",
                 transition: "all 0.15s",
               }}
@@ -265,6 +269,7 @@ export function PickerPanel() {
                 </pre>
                 <button
                   onClick={handleCopy}
+                  aria-label={t("aria.copyPrompt")}
                   style={{
                     display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                     width: "100%", padding: "10px 0", borderRadius: 12,
@@ -313,6 +318,7 @@ function InfoCard({ label, children, copyable, value }: {
           <button
             onClick={handleCopy}
             className="btn-ghost"
+            aria-label={t("aria.copyPrompt")}
             style={{ padding: 3 }}
           >
             {copied ? <Check size={12} style={{ color: "var(--green)" }} /> : <Copy size={12} />}

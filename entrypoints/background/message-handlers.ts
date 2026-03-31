@@ -14,6 +14,7 @@ export function setupMessageHandlers() {
         if (sender.tab?.id) {
           chrome.sidePanel.open({ tabId: sender.tab.id }).catch(() => {});
         }
+        sendResponse({ success: true });
         break;
 
       case "translate:text":
@@ -29,12 +30,12 @@ export function setupMessageHandlers() {
         return true;
 
       case "bookmark:add":
-        handleAddBookmark(data);
-        break;
+        handleAddBookmark(data).then(() => sendResponse({ success: true }));
+        return true;
 
       case "note:clip":
-        handleClipNote(data);
-        break;
+        handleClipNote(data).then(() => sendResponse({ success: true }));
+        return true;
 
       case "picker:element-selected":
         chrome.storage.session.set({ wa_pending_element: data.elementInfo });

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Search, FileText, Globe, MapPin, ChevronUp, ChevronDown, X, ExternalLink, Loader2, SearchX, Sparkles, Zap } from "lucide-react";
 import { t } from "../../lib/utils/i18n";
 
@@ -151,7 +151,7 @@ export function SearchPanel() {
     } catch { setWebRes([]); } finally { setLoading(false); }
   }, []);
 
-  const go = () => {
+  const go = useCallback(() => {
     if (mode === "page") {
       if (pageMode === "exact") searchPage(query);
       else searchPageAI(query);
@@ -160,8 +160,17 @@ export function SearchPanel() {
     } else {
       searchWeb(query);
     }
-  };
+  }, [mode, pageMode, query, searchPage, searchPageAI, searchSite, searchWeb]);
   const onKey = (e: React.KeyboardEvent) => { if (e.key === "Enter") go(); };
+
+  // Debounce: auto-search for page-exact mode after 300ms of inactivity
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => {
+    if (mode === "page" && pageMode === "exact" && query.trim()) {
+      debounceRef.current = setTimeout(() => searchPage(query), 300);
+      return () => clearTimeout(debounceRef.current);
+    }
+  }, [query, mode, pageMode, searchPage]);
 
   const handleModeChange = (m: Mode) => {
     setMode(m);
@@ -216,9 +225,10 @@ export function SearchPanel() {
         }}>
           <Search size={17} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
           <input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={onKey}
+            aria-label={t("tab.search")}
             placeholder={mode === "site" && siteDomain ? `${t("search.placeholder").replace("...", "")} ${siteDomain}` : t("search.placeholder")}
             style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: 15, color: "var(--text-strong)", padding: 0 }} />
-          {query && <button onClick={handleClear} className="btn-ghost" style={{ padding: 4 }}><X size={15} style={{ color: "var(--text-muted)" }} /></button>}
+          {query && <button onClick={handleClear} className="btn-ghost" style={{ padding: 4 }} aria-label={t("aria.clearSearch")}><X size={15} style={{ color: "var(--text-muted)" }} /></button>}
         </div>
 
         {/* Page search sub-toggle: exact vs AI */}
@@ -257,8 +267,8 @@ export function SearchPanel() {
             </span>
             {pageRes.count > 0 && (
               <div style={{ display: "flex", gap: 6 }}>
-                <button onClick={() => nav("prev")} className="btn-ghost" style={{ border: "1px solid var(--border-default)", borderRadius: 10, padding: 6 }}><ChevronUp size={16} /></button>
-                <button onClick={() => nav("next")} className="btn-ghost" style={{ border: "1px solid var(--border-default)", borderRadius: 10, padding: 6 }}><ChevronDown size={16} /></button>
+                <button onClick={() => nav("prev")} className="btn-ghost" style={{ border: "1px solid var(--border-default)", borderRadius: 10, padding: 6 }} aria-label={t("aria.prevResult")}><ChevronUp size={16} /></button>
+                <button onClick={() => nav("next")} className="btn-ghost" style={{ border: "1px solid var(--border-default)", borderRadius: 10, padding: 6 }} aria-label={t("aria.nextResult")}><ChevronDown size={16} /></button>
               </div>
             )}
           </div>
@@ -274,14 +284,14 @@ export function SearchPanel() {
 
         {/* AI error */}
         {isPageMode && aiError && (
-          <div className="anim-in" style={{ fontSize: 13, color: "var(--red)", padding: "6px 12px", borderRadius: 8, background: "var(--red-soft)" }}>
+          <div className="anim-in" role="alert" style={{ fontSize: 13, color: "var(--red)", padding: "6px 12px", borderRadius: 8, background: "var(--red-soft)" }}>
             {aiError}
           </div>
         )}
       </div>
 
       <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 10 }}>
           {/* Loading for web/site search */}
           {showResults && loading && (
             <div className="anim-in" style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "48px 0", gap: 10 }}>
@@ -312,10 +322,10 @@ export function SearchPanel() {
 
           {/* Web/site results */}
           {showResults && webRes.map((r, i) => (
-            <a key={i} href={r.url} target="_blank" rel="noopener noreferrer" className="tile anim-in" style={{ display: "block", textDecoration: "none", animationDelay: `${i * 30}ms` }}>
+            <li key={i}><a href={r.url} target="_blank" rel="noopener noreferrer" className="tile anim-in" style={{ display: "block", textDecoration: "none", animationDelay: `${i * 30}ms` }}>
               <div style={{ fontWeight: 600, fontSize: 14, color: "var(--tint)", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.title}</div>
               <div style={{ fontSize: 13, color: "var(--text-body)", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{r.snippet}</div>
-            </a>
+            </a></li>
           ))}
 
           {/* Google fallback link at bottom of site results */}
@@ -330,7 +340,7 @@ export function SearchPanel() {
               {t("search.openInGoogle")}
             </a>
           )}
-        </div>
+        </ul>
       </div>
     </div>
   );

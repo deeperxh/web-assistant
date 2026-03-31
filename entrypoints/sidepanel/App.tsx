@@ -17,16 +17,17 @@ import { PickerPanel } from "../../components/picker/PickerPanel";
 import { TranslationBar } from "../../components/translation/TranslationBar";
 import { useChatStore } from "../../stores/chat-store";
 import { usePageContext } from "../../hooks/usePageContext";
+import { t } from "../../lib/utils/i18n";
 
 type Tab = "chat" | "search" | "bookmarks" | "notes" | "picker" | "settings";
 
-const tabs: { id: Tab; icon: typeof MessageCircle; label: string }[] = [
-  { id: "chat", icon: MessageCircle, label: "对话" },
-  { id: "search", icon: Search, label: "搜索" },
-  { id: "picker", icon: Crosshair, label: "选取" },
-  { id: "bookmarks", icon: Bookmark, label: "书签" },
-  { id: "notes", icon: FileText, label: "笔记" },
-  { id: "settings", icon: Settings, label: "设置" },
+const tabDefs: { id: Tab; icon: typeof MessageCircle; labelKey: string }[] = [
+  { id: "chat", icon: MessageCircle, labelKey: "tab.chat" },
+  { id: "search", icon: Search, labelKey: "tab.search" },
+  { id: "picker", icon: Crosshair, labelKey: "tab.picker" },
+  { id: "bookmarks", icon: Bookmark, labelKey: "tab.bookmarks" },
+  { id: "notes", icon: FileText, labelKey: "tab.notes" },
+  { id: "settings", icon: Settings, labelKey: "tab.settings" },
 ];
 
 export default function App() {
@@ -78,7 +79,7 @@ export default function App() {
           }}
         >
           <Plus size={14} />
-          新对话
+          {t("app.newChat")}
         </button>
         <TranslationBar />
       </div>
@@ -94,12 +95,14 @@ export default function App() {
           borderTop: "0.5px solid var(--border-subtle)",
         }}
       >
-        {tabs.map(({ id, icon: Icon, label }) => {
+        {tabDefs.map(({ id, icon: Icon, labelKey }) => {
           const on = activeTab === id;
+          const label = t(labelKey);
           return (
             <button
               key={id}
               onClick={() => setActiveTab(id)}
+              aria-label={label}
               style={{
                 flex: 1,
                 display: "flex",

@@ -31,6 +31,12 @@
   --bubble-user: #0a84ff;
   --bubble-user-text: #fff;
   --bubble-ai: #ffffff;
+  --code-header-bg: #1e1e2e;
+  --code-header-text: #a6adc8;
+  --code-body-bg: #282c34;
+  --code-copy-success: #30d158;
+  --hint-bg: rgba(255, 204, 0, 0.08);
+  --hint-text: #b8860b;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -60,6 +66,12 @@
     --bubble-user: #0a84ff;
     --bubble-user-text: #fff;
     --bubble-ai: #1c1c1e;
+    --code-header-bg: #1e1e2e;
+    --code-header-text: #a6adc8;
+    --code-body-bg: #282c34;
+    --code-copy-success: #30d158;
+    --hint-bg: rgba(255, 204, 0, 0.1);
+    --hint-text: #d4a017;
   }
 }
 
@@ -137,6 +149,7 @@ body {
 }
 .btn-tint:hover { background: var(--tint-hover); transform: translateY(-0.5px); }
 .btn-tint:active { transform: scale(0.97); }
+.btn-tint:focus-visible { outline: 2px solid var(--tint); outline-offset: 2px; }
 
 .btn-ghost {
   display: inline-flex; align-items: center; justify-content: center;
@@ -146,6 +159,7 @@ body {
   cursor: pointer; transition: all 0.15s ease;
 }
 .btn-ghost:hover { background: var(--bg-sunken); color: var(--text-strong); }
+.btn-ghost:focus-visible { outline: 2px solid var(--tint); outline-offset: 2px; }
 
 /* === Inputs === */
 .field {
@@ -217,4 +231,19 @@ body {
   background: var(--bg-sunken); color: var(--tint);
   padding: 2px 6px; border-radius: 5px; font-size: 0.88em;
   font-family: "SF Mono", Menlo, monospace;
+}
+
+/* === Focus indicators === */
+nav button:focus-visible { outline: 2px solid var(--tint); outline-offset: -2px; }
+button:focus-visible { outline: 2px solid var(--tint); outline-offset: 2px; }
+select:focus-visible { outline: 2px solid var(--tint); outline-offset: 2px; }
+textarea:focus-visible { outline: none; }
+
+/* === Reduced motion === */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

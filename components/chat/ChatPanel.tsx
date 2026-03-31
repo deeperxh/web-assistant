@@ -22,24 +22,24 @@ export function ChatPanel() {
     return (
       <div style={{ display: "flex", flexDirection: "column", height: "100%" }} className="anim-in">
         <div className="frosted-bar" style={{ padding: "14px 20px", display: "flex", alignItems: "center", gap: 12 }}>
-          <button onClick={() => setShowHistory(false)} className="btn-ghost" style={{ padding: 6 }}>
+          <button onClick={() => setShowHistory(false)} className="btn-ghost" style={{ padding: 6 }} aria-label={t("common.close")}>
             <ArrowLeft size={20} />
           </button>
           <span style={{ fontWeight: 600, fontSize: 16 }}>{t("chat.history")}</span>
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 10 }}>
             {conversations.length === 0 ? (
               <Empty icon={<MessageCircle size={32} />} text={t("chat.empty")} />
             ) : (
               conversations.map((c, i) => (
-                <div
+                <li
                   key={c.id}
                   className="tile anim-in"
                   style={{
                     cursor: "pointer",
                     background: c.id === activeConversation?.id ? "var(--tint-soft)" : undefined,
-                    animationDelay: `${i * 25}ms`,
+                    animationDelay: `${Math.min(i * 25, 500)}ms`,
                   }}
                   onClick={() => { selectConversation(c.id); setShowHistory(false); }}
                 >
@@ -52,21 +52,22 @@ export function ChatPanel() {
                         </div>
                       )}
                       <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
-                        {c.messages.length} 条消息 · {new Date(c.updatedAt).toLocaleDateString()}
+                        {t("chat.messageCount", { count: String(c.messages.length) })} · {new Date(c.updatedAt).toLocaleDateString()}
                       </div>
                     </div>
                     <button
                       onClick={(e) => { e.stopPropagation(); deleteConversation(c.id); }}
                       className="btn-ghost"
                       style={{ color: "var(--red)", padding: 6 }}
+                      aria-label={t("aria.deleteConversation")}
                     >
                       <Trash2 size={15} />
                     </button>
                   </div>
-                </div>
+                </li>
               ))
             )}
-          </div>
+          </ul>
         </div>
       </div>
     );
@@ -79,10 +80,10 @@ export function ChatPanel() {
       <div className="frosted-bar" style={{ padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontWeight: 600, fontSize: 16 }}>{t("tab.chat")}</span>
         <div style={{ display: "flex", gap: 2 }}>
-          <button onClick={() => setShowHistory(true)} className="btn-ghost" style={{ padding: 7 }} title={t("chat.history")}>
+          <button onClick={() => setShowHistory(true)} className="btn-ghost" style={{ padding: 7 }} title={t("chat.history")} aria-label={t("chat.history")}>
             <History size={19} />
           </button>
-          <button onClick={newConversation} className="btn-ghost" style={{ padding: 7 }} title={t("chat.newChat")}>
+          <button onClick={newConversation} className="btn-ghost" style={{ padding: 7 }} title={t("chat.newChat")} aria-label={t("chat.newChat")}>
             <Plus size={19} />
           </button>
         </div>
@@ -121,7 +122,7 @@ export function ChatPanel() {
               </div>
               <div style={{ textAlign: "center" }}>
                 <div style={{ fontWeight: 500, fontSize: 15, color: "var(--text-body)" }}>{t("chat.empty")}</div>
-                <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>选中网页文字可直接引用提问</div>
+                <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>{t("chat.selectionHint")}</div>
               </div>
             </div>
           )}

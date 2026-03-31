@@ -16,17 +16,68 @@ export default defineContentScript({
     let floatingButton: HTMLElement | null = null;
     let translationTargetLang = "zh-CN";
 
-    // Load translation target language from settings
+    // Dark mode aware colors
+    const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const COLORS = {
+      light: {
+        barBg: "#1f2937", barText: "#e5e7eb", barHover: "#374151",
+        tooltipBg: "#1f2937", tooltipText: "#e5e7eb",
+        toastBg: "#22c55e", toastText: "#ffffff",
+        searchMark: "#fbbf24", searchMarkCurrent: "#f97316", searchMarkText: "#1f2937",
+        aiMark: "#a78bfa",
+        pickerBorder: "#0a84ff", pickerBg: "rgba(10, 132, 255, 0.08)",
+      },
+      dark: {
+        barBg: "#1e293b", barText: "#f1f5f9", barHover: "#334155",
+        tooltipBg: "#1e293b", tooltipText: "#f1f5f9",
+        toastBg: "#22c55e", toastText: "#ffffff",
+        searchMark: "#fbbf24", searchMarkCurrent: "#f97316", searchMarkText: "#1f2937",
+        aiMark: "#a78bfa",
+        pickerBorder: "#409cff", pickerBg: "rgba(64, 156, 255, 0.12)",
+      },
+    };
+    let colors = darkQuery.matches ? COLORS.dark : COLORS.light;
+    darkQuery.addEventListener("change", (e) => { colors = e.matches ? COLORS.dark : COLORS.light; });
+
+    // Content script i18n
+    const STRINGS = {
+      "zh-CN": {
+        extensionUpdated: "扩展已更新，请刷新页面后重试",
+        translating: "翻译中...",
+        translationFailed: "翻译失败：无响应",
+        saved: "已保存!",
+        askAI: "问 AI",
+        translate: "翻译",
+        save: "保存",
+      },
+      en: {
+        extensionUpdated: "Extension updated. Please refresh the page.",
+        translating: "Translating...",
+        translationFailed: "Translation failed: no response",
+        saved: "Saved!",
+        askAI: "Ask AI",
+        translate: "Translate",
+        save: "Save",
+      },
+    } as const;
+    let csLang: "zh-CN" | "en" = "zh-CN";
+    const cs = (key: keyof typeof STRINGS["zh-CN"]) => STRINGS[csLang]?.[key] || STRINGS["zh-CN"][key];
+
+    // Load translation target language and locale from settings
     try {
       chrome.storage.local.get("wa_ai_settings", (result) => {
         if (chrome.runtime.lastError) return;
         if (result.wa_ai_settings?.translationTargetLang) {
           translationTargetLang = result.wa_ai_settings.translationTargetLang;
         }
+        if (result.wa_ai_settings?.locale === "en") csLang = "en";
       });
       chrome.storage.onChanged.addListener((changes) => {
         if (changes.wa_ai_settings?.newValue?.translationTargetLang) {
           translationTargetLang = changes.wa_ai_settings.newValue.translationTargetLang;
+        }
+        if (changes.wa_ai_settings?.newValue?.locale) {
+          csLang = changes.wa_ai_settings.newValue.locale === "en" ? "en" : "zh-CN";
         }
       });
     } catch {
@@ -41,14 +92,14 @@ export default defineContentScript({
     function safeSendMessage(msg: unknown, callback?: (response: any) => void) {
       try {
         if (!chrome.runtime?.id) {
-          showToast("扩展已更新，请刷新页面后重试");
+          showToast(cs("extensionUpdated"));
           return;
         }
         chrome.runtime.sendMessage(msg as any, (response: any) => {
           if (chrome.runtime.lastError) {
             const err = chrome.runtime.lastError.message || "";
             if (err.includes("invalidated") || err.includes("Receiving end does not exist")) {
-              showToast("扩展已更新，请刷新页面后重试");
+              showToast(cs("extensionUpdated"));
             } else {
               console.warn("[WA]", err);
             }
@@ -57,7 +108,7 @@ export default defineContentScript({
           callback?.(response);
         });
       } catch (e) {
-        showToast("扩展已更新，请刷新页面后重试");
+        showToast(cs("extensionUpdated"));
       }
     }
 
@@ -138,16 +189,16 @@ export default defineContentScript({
         display: flex;
         gap: 2px;
         padding: 4px;
-        background: #1f2937;
+        background: ${colors.barBg};
         border-radius: 8px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         animation: wa-fade-in 0.15s ease;
       `;
 
       const buttons = [
-        { label: "Ask AI", icon: "💬", action: "ask" },
-        { label: "Translate", icon: "🌐", action: "translate" },
-        { label: "Save", icon: "📌", action: "save" },
+        { label: cs("askAI"), icon: "💬", action: "ask" },
+        { label: cs("translate"), icon: "🌐", action: "translate" },
+        { label: cs("save"), icon: "📌", action: "save" },
       ];
 
       for (const btn of buttons) {
@@ -155,11 +206,11 @@ export default defineContentScript({
         el.style.cssText = `
           display: flex; align-items: center; gap: 4px;
           padding: 4px 8px; border: none; border-radius: 6px;
-          background: transparent; color: #e5e7eb; font-size: 12px;
+          background: transparent; color: ${colors.barText}; font-size: 12px;
           cursor: pointer; white-space: nowrap;
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         `;
-        el.onmouseenter = () => { el.style.background = "#374151"; };
+        el.onmouseenter = () => { el.style.background = colors.barHover; };
         el.onmouseleave = () => { el.style.background = "transparent"; };
         el.textContent = `${btn.icon} ${btn.label}`;
         el.addEventListener("click", (e) => {
@@ -198,7 +249,7 @@ export default defineContentScript({
           if (!savedRect) break;
 
           // Show loading tooltip immediately
-          const loadingTooltip = showTranslationTooltip(savedRect, "翻译中...");
+          const loadingTooltip = showTranslationTooltip(savedRect, cs("translating"));
 
           safeSendMessage(
             { type: "translate:text", data: { text, from: "auto", to: translationTargetLang } },
@@ -213,7 +264,7 @@ export default defineContentScript({
                 }
               } else {
                 loadingTooltip.remove();
-                showToast("翻译失败：无响应");
+                showToast(cs("translationFailed"));
               }
             },
           );
@@ -222,7 +273,7 @@ export default defineContentScript({
         case "save":
           safeSendMessage(
             { type: "note:clip", data: { text, url: location.href, title: document.title } },
-            () => showToast("已保存!"),
+            () => showToast(cs("saved")),
           );
           break;
       }
@@ -237,8 +288,8 @@ export default defineContentScript({
         left: ${Math.min(rect.left, window.innerWidth - 320)}px;
         max-width: 300px;
         padding: 12px;
-        background: #1f2937;
-        color: #e5e7eb;
+        background: ${colors.tooltipBg};
+        color: ${colors.tooltipText};
         border-radius: 8px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         font-size: 13px;
@@ -261,7 +312,7 @@ export default defineContentScript({
       toast.setAttribute("data-wa-ui", "true");
       toast.style.cssText = `
         position: fixed; bottom: 20px; right: 20px;
-        padding: 8px 16px; background: #22c55e; color: white;
+        padding: 8px 16px; background: ${colors.toastBg}; color: ${colors.toastText};
         border-radius: 8px; font-size: 13px; z-index: 2147483647;
         animation: wa-fade-in 0.15s ease;
       `;
@@ -312,7 +363,7 @@ export default defineContentScript({
         for (let i = ranges.length - 1; i >= 0; i--) {
           const mark = document.createElement("mark");
           mark.setAttribute("data-wa-search", "true");
-          mark.style.cssText = "background: #fbbf24; color: #1f2937; padding: 0 1px; border-radius: 2px;";
+          mark.style.cssText = `background: ${colors.searchMark}; color: ${colors.searchMarkText}; padding: 0 1px; border-radius: 2px;`;
           ranges[i].surroundContents(mark);
           searchMarks.unshift(mark);
         }
@@ -335,7 +386,7 @@ export default defineContentScript({
 
     function highlightCurrent() {
       for (let i = 0; i < searchMarks.length; i++) {
-        searchMarks[i].style.background = i === currentIndex ? "#f97316" : "#fbbf24";
+        searchMarks[i].style.background = i === currentIndex ? colors.searchMarkCurrent : colors.searchMark;
       }
       searchMarks[currentIndex]?.scrollIntoView({ behavior: "smooth", block: "center" });
     }
@@ -436,7 +487,7 @@ export default defineContentScript({
           for (let i = ranges.length - 1; i >= 0; i--) {
             const mark = document.createElement("mark");
             mark.setAttribute("data-wa-search", "true");
-            mark.style.cssText = "background: #a78bfa; color: #1f2937; padding: 0 2px; border-radius: 2px;";
+            mark.style.cssText = `background: ${colors.aiMark}; color: ${colors.searchMarkText}; padding: 0 2px; border-radius: 2px;`;
             try { ranges[i].surroundContents(mark); } catch { continue; }
             searchMarks.unshift(mark);
           }
@@ -471,8 +522,8 @@ export default defineContentScript({
       pickerOverlay.style.cssText = `
         position: fixed;
         pointer-events: none;
-        border: 2px solid #0a84ff;
-        background: rgba(10, 132, 255, 0.08);
+        border: 2px solid ${colors.pickerBorder};
+        background: ${colors.pickerBg};
         border-radius: 3px;
         z-index: 2147483647;
         transition: top 0.08s ease, left 0.08s ease, width 0.08s ease, height 0.08s ease;

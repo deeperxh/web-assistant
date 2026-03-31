@@ -5,6 +5,7 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { Copy, Check } from "lucide-react";
 import type { ChatMessage } from "../../lib/ai/types";
+import { t } from "../../lib/utils/i18n";
 
 interface Props { message: ChatMessage; isStreaming?: boolean; }
 
@@ -85,25 +86,26 @@ function CodeBlock({ language, code }: { language: string; code: string }) {
     <div style={{ margin: "10px 0", borderRadius: 12, overflow: "hidden", border: "1px solid var(--border-subtle)" }}>
       <div style={{
         display: "flex", justifyContent: "space-between", alignItems: "center",
-        padding: "6px 14px", background: "#1e1e2e", color: "#a6adc8", fontSize: 12,
+        padding: "6px 14px", background: "var(--code-header-bg)", color: "var(--code-header-text)", fontSize: 12,
       }}>
         <span style={{ fontFamily: "monospace", fontWeight: 500 }}>{language}</span>
         <button
           onClick={copy}
+          aria-label={t("aria.copyCode")}
           style={{
             display: "flex", alignItems: "center", gap: 5,
-            background: "transparent", border: "none", color: copied ? "#30d158" : "#a6adc8",
+            background: "transparent", border: "none", color: copied ? "var(--code-copy-success)" : "var(--code-header-text)",
             cursor: "pointer", fontSize: 12, padding: "2px 6px", borderRadius: 5,
           }}
         >
           {copied ? <Check size={12} /> : <Copy size={12} />}
-          {copied ? "已复制" : "复制"}
+          {copied ? t("common.copied") : t("common.copy")}
         </button>
       </div>
       <SyntaxHighlighter
         language={language}
         style={oneDark}
-        customStyle={{ margin: 0, padding: "14px 16px", fontSize: 13, background: "#282c34", lineHeight: 1.6 }}
+        customStyle={{ margin: 0, padding: "14px 16px", fontSize: 13, background: "var(--code-body-bg)", lineHeight: 1.6 }}
       >
         {code}
       </SyntaxHighlighter>

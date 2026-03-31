@@ -7,7 +7,32 @@ export default defineContentScript({
     let hoverTimeout: ReturnType<typeof setTimeout> | null = null;
     let isPageTranslated = false;
     const translatedNodes: HTMLElement[] = [];
+
+    // LRU cache with max 500 entries
+    const CACHE_MAX = 500;
     const translationCache = new Map<string, string>();
+    function cacheGet(key: string): string | undefined {
+      const val = translationCache.get(key);
+      if (val !== undefined) { translationCache.delete(key); translationCache.set(key, val); }
+      return val;
+    }
+    function cacheSet(key: string, value: string): void {
+      if (translationCache.has(key)) translationCache.delete(key);
+      else if (translationCache.size >= CACHE_MAX) {
+        const first = translationCache.keys().next().value;
+        if (first !== undefined) translationCache.delete(first);
+      }
+      translationCache.set(key, value);
+    }
+
+    // Dark mode aware colors
+    const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const COLORS = {
+      light: { tooltipBg: "#1f2937", tooltipText: "#e5e7eb", translationText: "#0a84ff", translationBorder: "rgba(10, 132, 255, 0.3)" },
+      dark: { tooltipBg: "#1e293b", tooltipText: "#f1f5f9", translationText: "#409cff", translationBorder: "rgba(64, 156, 255, 0.3)" },
+    };
+    let colors = darkQuery.matches ? COLORS.dark : COLORS.light;
+    darkQuery.addEventListener("change", (e) => { colors = e.matches ? COLORS.dark : COLORS.light; });
 
     // Load settings
     chrome.storage.local.get("wa_translation_settings", (result) => {
@@ -40,12 +65,21 @@ export default defineContentScript({
       return false;
     });
 
+    // Throttled mousemove handler (~100ms)
+    let lastHoverTime = 0;
+    function throttledHover(e: MouseEvent) {
+      const now = Date.now();
+      if (now - lastHoverTime < 100) return;
+      lastHoverTime = now;
+      handleHover(e);
+    }
+
     function setupHoverTranslation() {
-      document.addEventListener("mousemove", handleHover);
+      document.addEventListener("mousemove", throttledHover);
     }
 
     function teardownHoverTranslation() {
-      document.removeEventListener("mousemove", handleHover);
+      document.removeEventListener("mousemove", throttledHover);
       removeHoverTooltip();
     }
 
@@ -98,8 +132,8 @@ export default defineContentScript({
         left: ${Math.min(x, window.innerWidth - 280)}px;
         max-width: 260px;
         padding: 8px 12px;
-        background: #1f2937;
-        color: #e5e7eb;
+        background: ${colors.tooltipBg};
+        color: ${colors.tooltipText};
         border-radius: 8px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         font-size: 13px;
@@ -303,7 +337,7 @@ export default defineContentScript({
         const results: string[] = new Array(batch.length).fill("");
 
         for (let j = 0; j < batch.length; j++) {
-          const cached = translationCache.get(batch[j].originalText);
+          const cached = cacheGet(batch[j].originalText);
           if (cached) {
             results[j] = cached;
           } else {
@@ -324,7 +358,7 @@ export default defineContentScript({
             for (let k = 0; k < uncachedIndices.length; k++) {
               const tr = response.translations[k] || "";
               results[uncachedIndices[k]] = tr;
-              if (tr) translationCache.set(batch[uncachedIndices[k]].originalText, tr);
+              if (tr) cacheSet(batch[uncachedIndices[k]].originalText, tr);
             }
           } catch {
             // API failed, cached results still available
@@ -339,12 +373,12 @@ export default defineContentScript({
           const translatedEl = document.createElement("div");
           translatedEl.setAttribute("data-wa-translated", "true");
           translatedEl.style.cssText = `
-            color: #0a84ff;
+            color: ${colors.translationText};
             font-size: 0.92em;
             line-height: 1.6;
             margin-top: 4px;
             padding: 2px 0;
-            border-left: 2px solid rgba(10, 132, 255, 0.3);
+            border-left: 2px solid ${colors.translationBorder};
             padding-left: 8px;
           `;
           translatedEl.textContent = tr;

@@ -72,9 +72,9 @@ export function TranslationBar() {
       if (chrome.runtime.lastError) {
         const msg = chrome.runtime.lastError.message || "";
         if (msg.includes("Receiving end does not exist") || msg.includes("Could not establish connection")) {
-          setError("请先刷新页面");
+          setError(t("translation.refreshPage"));
         } else {
-          setError(msg || "发送失败");
+          setError(msg || t("settings.requestFailed"));
         }
         setTranslating(false);
       }
@@ -94,6 +94,7 @@ export function TranslationBar() {
     return (
       <button
         onClick={handleRestore}
+        aria-label={t("translation.restorePage")}
         style={{
           display: "flex", alignItems: "center", gap: 6,
           padding: "6px 12px", borderRadius: 10,
@@ -114,6 +115,7 @@ export function TranslationBar() {
       <button
         onClick={handleTranslate}
         disabled={translating}
+        aria-label={t("translation.translatePage")}
         style={{
           display: "flex", alignItems: "center", gap: 6,
           padding: "6px 12px", borderRadius: 10,
@@ -137,7 +139,7 @@ export function TranslationBar() {
         )}
       </button>
       {error && (
-        <span style={{ fontSize: 11, color: "#ef4444" }}>{error}</span>
+        <span role="alert" style={{ fontSize: 11, color: "var(--red)" }}>{error}</span>
       )}
     </div>
   );

@@ -27,7 +27,7 @@ export function BookmarksPanel() {
       <div className="frosted-bar" style={{ padding: "14px 20px 18px", display: "flex", flexDirection: "column", gap: 14 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ fontWeight: 600, fontSize: 16 }}>{t("bookmarks.title")}</span>
-          <button onClick={handleAdd} className="btn-tint" style={{ fontSize: 13, padding: "7px 14px", gap: 5 }}>
+          <button onClick={handleAdd} className="btn-tint" style={{ fontSize: 13, padding: "7px 14px", gap: 5 }} aria-label={t("bookmarks.add")}>
             <Plus size={15} /> {t("bookmarks.add")}
           </button>
         </div>
@@ -38,13 +38,14 @@ export function BookmarksPanel() {
         }}>
           <Search size={16} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("search.placeholder")}
+            aria-label={t("aria.searchBookmarks")}
             style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: 15, color: "var(--text-strong)", padding: 0 }} />
-          {search && <button onClick={() => setSearch("")} className="btn-ghost" style={{ padding: 4 }}><X size={14} style={{ color: "var(--text-muted)" }} /></button>}
+          {search && <button onClick={() => setSearch("")} className="btn-ghost" style={{ padding: 4 }} aria-label={t("aria.clearSearch")}><X size={14} style={{ color: "var(--text-muted)" }} /></button>}
         </div>
       </div>
 
       <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 8 }}>
           {filtered.length === 0 && (
             <div className="anim-in" style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "48px 0", gap: 12 }}>
               <div style={{ padding: 16, borderRadius: 18, background: "var(--bg-sunken)" }}><Star size={28} style={{ color: "var(--text-muted)" }} /></div>
@@ -52,7 +53,7 @@ export function BookmarksPanel() {
             </div>
           )}
           {filtered.map((bm, i) => (
-            <div key={bm.id} className="tile anim-in" style={{ display: "flex", alignItems: "center", gap: 12, animationDelay: `${i * 20}ms` }}>
+            <li key={bm.id} className="tile anim-in" style={{ display: "flex", alignItems: "center", gap: 12, animationDelay: `${i * 20}ms` }}>
               <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--bg-sunken)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 {bm.favicon ? <img src={bm.favicon} alt="" style={{ width: 20, height: 20, borderRadius: 4 }} /> : <Star size={15} style={{ color: "var(--text-muted)" }} />}
               </div>
@@ -63,12 +64,12 @@ export function BookmarksPanel() {
                 </div>
               </div>
               <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
-                <a href={bm.url} target="_blank" rel="noopener noreferrer" className="btn-ghost" style={{ padding: 7 }}><ExternalLink size={15} /></a>
-                <button onClick={() => { removeBookmark(bm.id); load(); }} className="btn-ghost" style={{ padding: 7, color: "var(--red)" }}><Trash2 size={15} /></button>
+                <a href={bm.url} target="_blank" rel="noopener noreferrer" className="btn-ghost" style={{ padding: 7 }} aria-label={t("aria.openLink")}><ExternalLink size={15} /></a>
+                <button onClick={() => { removeBookmark(bm.id); load(); }} className="btn-ghost" style={{ padding: 7, color: "var(--red)" }} aria-label={t("aria.deleteBookmark")}><Trash2 size={15} /></button>
               </div>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
     </div>
   );

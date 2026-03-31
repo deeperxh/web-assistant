@@ -50,14 +50,14 @@ export function SettingsPanel() {
 
     const provider = providerRegistry.get(settings.activeProvider);
     if (!provider) {
-      setTestResult({ ok: false, msg: "未知的 Provider" });
+      setTestResult({ ok: false, msg: t("settings.unknownProvider") });
       setTesting(false);
       return;
     }
 
     const cfg = settings.providers[settings.activeProvider] || {};
     if (!cfg.apiKey && settings.activeProvider !== "ollama") {
-      setTestResult({ ok: false, msg: "请先填写 API Key" });
+      setTestResult({ ok: false, msg: t("settings.apiKeyRequired") });
       setTesting(false);
       return;
     }
@@ -79,15 +79,15 @@ export function SettingsPanel() {
           responseText += chunk.content;
         }
         if (chunk.type === "error") {
-          setTestResult({ ok: false, msg: chunk.error || "请求失败" });
+          setTestResult({ ok: false, msg: chunk.error || t("settings.requestFailed") });
           setTesting(false);
           return;
         }
       }
 
-      setTestResult({ ok: true, msg: `连接成功! 回复: "${responseText.slice(0, 50)}"` });
+      setTestResult({ ok: true, msg: t("settings.connectionSuccess", { reply: responseText.slice(0, 50) }) });
     } catch (err) {
-      setTestResult({ ok: false, msg: err instanceof Error ? err.message : "请求异常" });
+      setTestResult({ ok: false, msg: err instanceof Error ? err.message : t("settings.requestError") });
     } finally {
       setTesting(false);
     }
@@ -148,12 +148,12 @@ export function SettingsPanel() {
       <div className="frosted-bar" style={{ padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontWeight: 600, fontSize: 16 }}>{t("settings.title")}</span>
         {saved && (
-          <span className="saved-badge" style={{
+          <span className="saved-badge" role="status" style={{
             display: "inline-flex", alignItems: "center", gap: 4,
             background: "var(--green-soft)", color: "var(--green)",
             fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 8,
           }}>
-            <Check size={12} /> 已保存
+            <Check size={12} /> {t("settings.saved")}
           </span>
         )}
       </div>
@@ -163,7 +163,7 @@ export function SettingsPanel() {
 
           <Field label={t("settings.provider")}>
             <div style={{ position: "relative" }}>
-              <select className="field-select" value={settings.activeProvider} onChange={(e) => {
+              <select className="field-select" aria-label={t("aria.providerSelect")} value={settings.activeProvider} onChange={(e) => {
                 const p = providers.find((x) => x.id === e.target.value);
                 update({ activeProvider: e.target.value, activeModel: p?.models[0]?.id || "" });
                 setTestResult(null);
@@ -179,6 +179,7 @@ export function SettingsPanel() {
               <input
                 type={showKey ? "text" : "password"}
                 className="field"
+                aria-label={t("settings.apiKey")}
                 value={cfg.apiKey || ""}
                 onChange={(e) => { updateConfig("apiKey", e.target.value); setTestResult(null); }}
                 placeholder="sk-..."
@@ -187,6 +188,7 @@ export function SettingsPanel() {
               <button
                 onClick={() => setShowKey(!showKey)}
                 className="btn-ghost"
+                aria-label={t("aria.toggleKeyVisibility")}
                 style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", padding: 6 }}
               >
                 {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -197,13 +199,14 @@ export function SettingsPanel() {
           <Field label={t("settings.baseUrl")}>
             <input
               type="text" className="field"
+              aria-label={t("settings.baseUrl")}
               value={cfg.baseUrl || ""}
               onChange={(e) => { updateConfig("baseUrl", e.target.value); setTestResult(null); }}
-              placeholder={activeProvider ? `默认: ${(activeProvider as any).defaultBaseUrl || ""}` : ""}
+              placeholder={activeProvider ? t("settings.defaultUrl", { url: (activeProvider as any).defaultBaseUrl || "" }) : ""}
             />
             {computedUrl && (
               <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6, wordBreak: "break-all" }}>
-                实际请求: <span style={{ color: "var(--tint)" }}>{computedUrl}</span>
+                {t("settings.actualUrl")} <span style={{ color: "var(--tint)" }}>{computedUrl}</span>
               </div>
             )}
           </Field>
@@ -213,17 +216,18 @@ export function SettingsPanel() {
               <input
                 type="text"
                 className="field"
+                aria-label={t("settings.model")}
                 list="model-suggestions"
                 value={settings.activeModel}
                 onChange={(e) => update({ activeModel: e.target.value })}
-                placeholder="输入或选择模型名称"
+                placeholder={t("settings.modelPlaceholder")}
               />
               <datalist id="model-suggestions">
                 {models.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
               </datalist>
             </div>
             <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
-              可手动输入任意模型名，或从建议列表选择
+              {t("settings.modelHint")}
             </div>
           </Field>
 
@@ -233,13 +237,14 @@ export function SettingsPanel() {
               onClick={handleTestConnection}
               disabled={testing}
               className="btn-tint"
+              aria-label={t("settings.testConnection")}
               style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: testing ? 0.7 : 1 }}
             >
               {testing ? <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> : <Zap size={16} />}
-              {testing ? "测试中..." : "测试连接"}
+              {testing ? t("settings.testing") : t("settings.testConnection")}
             </button>
             {testResult && (
-              <div className="anim-in" style={{
+              <div className="anim-in" role="alert" style={{
                 display: "flex", alignItems: "flex-start", gap: 8, marginTop: 10,
                 padding: "10px 14px", borderRadius: 10, fontSize: 13, lineHeight: 1.5,
                 background: testResult.ok ? "var(--green-soft)" : "var(--red-soft)",
@@ -258,6 +263,7 @@ export function SettingsPanel() {
                   <div style={{ height: "100%", borderRadius: 4, width: `${(settings.temperature / 2) * 100}%`, background: "var(--tint-gradient)", transition: "width 0.15s" }} />
                 </div>
                 <input type="range" min="0" max="2" step="0.1" value={settings.temperature} onChange={(e) => update({ temperature: parseFloat(e.target.value) })}
+                  aria-label={t("aria.temperatureSlider")}
                   style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer" }} />
               </div>
               <span style={{ fontSize: 14, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: "var(--tint)", background: "var(--tint-soft)", padding: "4px 12px", borderRadius: 8, minWidth: 44, textAlign: "center" }}>
@@ -265,7 +271,7 @@ export function SettingsPanel() {
               </span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--text-muted)", marginTop: 6, padding: "0 2px" }}>
-              <span>精确</span><span>平衡</span><span>创意</span>
+              <span>{t("settings.tempPrecise")}</span><span>{t("settings.tempBalanced")}</span><span>{t("settings.tempCreative")}</span>
             </div>
           </Field>
 
@@ -280,7 +286,7 @@ export function SettingsPanel() {
 
           <Field label={t("settings.translationTarget")}>
             <div style={{ position: "relative" }}>
-              <select className="field-select" value={settings.translationTargetLang || "zh-CN"} onChange={(e) => update({ translationTargetLang: e.target.value })}>
+              <select className="field-select" aria-label={t("aria.translationTarget")} value={settings.translationTargetLang || "zh-CN"} onChange={(e) => update({ translationTargetLang: e.target.value })}>
                 <option value="zh-CN">简体中文</option>
                 <option value="en">English</option>
                 <option value="ja">日本語</option>
@@ -323,7 +329,7 @@ export function SettingsPanel() {
 
           {/* Export / Import buttons */}
           <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={handleExport} className="btn-tint" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+            <button onClick={handleExport} className="btn-tint" aria-label={t("settings.exportData")} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
               <Download size={16} />
               {t("settings.exportData")}
             </button>
@@ -345,7 +351,7 @@ export function SettingsPanel() {
 
           {/* Data operation result */}
           {dataMsg && (
-            <div className="anim-in" style={{
+            <div className="anim-in" role="alert" style={{
               display: "flex", alignItems: "flex-start", gap: 8,
               padding: "10px 14px", borderRadius: 10, fontSize: 13, lineHeight: 1.5,
               background: dataMsg.ok ? "var(--green-soft)" : "var(--red-soft)",
@@ -372,7 +378,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function Hint({ text }: { text: string }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, padding: "8px 12px", borderRadius: 10, background: "rgba(255, 204, 0, 0.08)", color: "#b8860b", fontSize: 13 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, padding: "8px 12px", borderRadius: 10, background: "var(--hint-bg)", color: "var(--hint-text)", fontSize: 13 }}>
       <Info size={14} style={{ flexShrink: 0 }} />
       <span>{text}</span>
     </div>
