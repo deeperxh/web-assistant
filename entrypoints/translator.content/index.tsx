@@ -28,6 +28,9 @@ export default defineContentScript({
           restorePage();
           sendResponse({ success: true });
           break;
+        case "translate:check-status":
+          sendResponse({ translated: isPageTranslated });
+          break;
         case "translate:hover-toggle":
           hoverEnabled = message.data.enabled;
           if (hoverEnabled) setupHoverTranslation();
@@ -123,6 +126,29 @@ export default defineContentScript({
     const BLOCK_TAGS = new Set(["P", "DIV", "LI", "TD", "TH", "H1", "H2", "H3", "H4", "H5", "H6", "BLOCKQUOTE", "ARTICLE", "SECTION", "DT", "DD", "FIGCAPTION", "SUMMARY"]);
     const HEADING_TAGS = new Set(["H1", "H2", "H3", "H4", "H5", "H6"]);
 
+    // GitHub/GitLab: only translate README content
+    const README_SELECTORS = [
+      "#readme .markdown-body",     // GitHub repo README
+      "article.markdown-body",      // GitHub wiki/gist/file preview
+      ".readme-holder .md",         // GitLab README
+      "article.md",                 // GitLab article
+      ".file-content .md",          // GitLab file content
+    ];
+
+    function isGitHubOrGitLab(): boolean {
+      const h = location.hostname;
+      return h === "github.com" || h.endsWith(".github.com")
+        || h.startsWith("gitlab.") || h === "gitlab.com" || h.endsWith(".gitlab.com");
+    }
+
+    function findReadmeRoot(): HTMLElement | null {
+      for (const sel of README_SELECTORS) {
+        const el = document.querySelector<HTMLElement>(sel);
+        if (el) return el;
+      }
+      return null;
+    }
+
     interface TextBlock {
       element: HTMLElement;
       originalText: string;
@@ -169,11 +195,11 @@ export default defineContentScript({
       }
     }
 
-    function collectTextBlocks(): TextBlock[] {
+    function collectTextBlocks(root?: HTMLElement): TextBlock[] {
       const blocks: TextBlock[] = [];
       const seen = new Set<HTMLElement>();
 
-      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT, {
+      const walker = document.createTreeWalker(root || document.body, NodeFilter.SHOW_ELEMENT, {
         acceptNode(node) {
           const el = node as HTMLElement;
           if (SKIP_TAGS.has(el.tagName)) return NodeFilter.FILTER_REJECT;
@@ -232,7 +258,18 @@ export default defineContentScript({
     async function translatePage(targetLang: string) {
       if (isPageTranslated) restorePage();
 
-      const blocks = collectTextBlocks();
+      // GitHub/GitLab: only translate README section
+      let root: HTMLElement | undefined;
+      if (isGitHubOrGitLab()) {
+        const readmeEl = findReadmeRoot();
+        if (!readmeEl) {
+          try { chrome.runtime.sendMessage({ type: "translate:page-done" }); } catch { /* ignore */ }
+          return;
+        }
+        root = readmeEl;
+      }
+
+      const blocks = collectTextBlocks(root);
       if (blocks.length === 0) {
         try {
           chrome.runtime.sendMessage({ type: "translate:page-done" });

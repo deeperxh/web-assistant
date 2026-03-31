@@ -5,6 +5,7 @@ import {
   Bookmark,
   FileText,
   Settings,
+  Plus,
 } from "lucide-react";
 import { ChatPanel } from "../../components/chat/ChatPanel";
 import { SearchPanel } from "../../components/search/SearchPanel";
@@ -53,11 +54,25 @@ export default function App() {
         {activeTab === "settings" && <SettingsPanel />}
       </div>
 
-      {/* Translation quick action */}
+      {/* Quick actions bar */}
       <div style={{
-        flexShrink: 0, display: "flex", justifyContent: "center", padding: "6px 16px",
+        flexShrink: 0, display: "flex", justifyContent: "center", gap: 8, padding: "6px 16px",
         borderTop: "0.5px solid var(--border-subtle)", background: "var(--bg-surface)",
       }}>
+        <button
+          onClick={() => { useChatStore.getState().newConversation(); setActiveTab("chat"); }}
+          style={{
+            display: "flex", alignItems: "center", gap: 6,
+            padding: "6px 12px", borderRadius: 10,
+            border: "1px solid var(--border-default)",
+            background: "transparent", color: "var(--text-body)",
+            fontSize: 12, fontWeight: 600, cursor: "pointer",
+            transition: "all 0.15s",
+          }}
+        >
+          <Plus size={14} />
+          新对话
+        </button>
         <TranslationBar />
       </div>
 

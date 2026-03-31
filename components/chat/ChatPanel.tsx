@@ -46,7 +46,12 @@ export function ChatPanel() {
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 500, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.title}</div>
-                      <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>
+                      {c.pageTitle && (
+                        <div style={{ fontSize: 12, color: "var(--tint)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", opacity: 0.7 }}>
+                          {c.pageTitle}
+                        </div>
+                      )}
+                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
                         {c.messages.length} 条消息 · {new Date(c.updatedAt).toLocaleDateString()}
                       </div>
                     </div>

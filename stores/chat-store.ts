@@ -80,6 +80,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   newConversation: async () => {
     const settings = await getAISettings();
+    const pc = get().pageContext;
     const conv: Conversation = {
       id: crypto.randomUUID(),
       title: "New Chat",
@@ -88,6 +89,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       model: settings.activeModel,
       createdAt: Date.now(),
       updatedAt: Date.now(),
+      url: pc?.url,
+      pageTitle: pc?.title,
     };
     await saveConversation(conv);
     await setActiveConversationId(conv.id);
@@ -134,11 +137,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
       timestamp: Date.now(),
     };
 
+    const pc = get().pageContext;
     const updated: Conversation = {
       ...conv,
       messages: [...conv.messages, message],
       title: conv.messages.length === 0 ? content.slice(0, 50) : conv.title,
       updatedAt: Date.now(),
+      url: conv.url || pc?.url,
+      pageTitle: conv.pageTitle || pc?.title,
     };
 
     set((s) => ({

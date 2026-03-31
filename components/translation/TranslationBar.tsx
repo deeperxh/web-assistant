@@ -23,6 +23,37 @@ export function TranslationBar() {
     return () => chrome.runtime.onMessage.removeListener(handler);
   }, []);
 
+  // Query content script for translation status when tab changes
+  useEffect(() => {
+    const checkStatus = async () => {
+      setTranslating(false);
+      setProgress(null);
+      setError(null);
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (!tab?.id) { setTranslated(false); return; }
+        chrome.tabs.sendMessage(tab.id, { type: "translate:check-status" }, (resp) => {
+          if (chrome.runtime.lastError || !resp) {
+            setTranslated(false);
+          } else {
+            setTranslated(!!resp.translated);
+          }
+        });
+      } catch {
+        setTranslated(false);
+      }
+    };
+    chrome.tabs.onActivated.addListener(checkStatus);
+    const onUpdated = (_tabId: number, info: chrome.tabs.TabChangeInfo) => {
+      if (info.status === "complete") checkStatus();
+    };
+    chrome.tabs.onUpdated.addListener(onUpdated);
+    return () => {
+      chrome.tabs.onActivated.removeListener(checkStatus);
+      chrome.tabs.onUpdated.removeListener(onUpdated);
+    };
+  }, []);
+
   const handleTranslate = useCallback(async () => {
     setTranslating(true);
     setProgress(null);

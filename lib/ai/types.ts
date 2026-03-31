@@ -58,6 +58,8 @@ export interface Conversation {
   model: string;
   createdAt: number;
   updatedAt: number;
+  url?: string;
+  pageTitle?: string;
 }
 
 export interface AISettings {
