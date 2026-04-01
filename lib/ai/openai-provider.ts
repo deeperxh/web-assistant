@@ -31,7 +31,7 @@ export class OpenAICompatibleProvider implements AIProvider {
     const baseUrl = config.baseUrl || this.defaultBaseUrl;
     const url = `${baseUrl.replace(/\/$/, "")}/v1/chat/completions`;
 
-    const timeout = AbortSignal.timeout(30000);
+    const timeout = AbortSignal.timeout(params.timeout || 30000);
     const signal = params.signal
       ? AbortSignal.any([params.signal, timeout])
       : timeout;

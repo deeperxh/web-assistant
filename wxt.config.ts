@@ -8,7 +8,7 @@ export default defineConfig({
     description:
       "AI-powered web assistant with translation, chat, bookmarks, and notes",
     version: "1.0.0",
-    permissions: ["sidePanel", "activeTab", "storage", "tabs", "contextMenus"],
+    permissions: ["sidePanel", "activeTab", "storage", "tabs", "contextMenus", "scripting"],
     host_permissions: [
       "https://api.openai.com/*",
       "https://api.anthropic.com/*",

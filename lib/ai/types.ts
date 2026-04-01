@@ -65,6 +65,8 @@ export interface ChatParams {
   maxTokens?: number;
   signal?: AbortSignal;
   tools?: ToolDefinition[];
+  /** Request timeout in ms (default 30000). */
+  timeout?: number;
 }
 
 export interface ChatChunk {

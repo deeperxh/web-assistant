@@ -51,8 +51,8 @@ export class AnthropicCompatibleProvider implements AIProvider {
       url = `${baseUrl}/v1/messages`;
     }
 
-    // Combine user abort signal with a 30s timeout
-    const timeout = AbortSignal.timeout(30000);
+    // Combine user abort signal with a configurable timeout
+    const timeout = AbortSignal.timeout(params.timeout || 30000);
     const signal = params.signal
       ? AbortSignal.any([params.signal, timeout])
       : timeout;

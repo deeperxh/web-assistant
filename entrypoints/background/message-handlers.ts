@@ -72,13 +72,106 @@ async function handleTranslateText(data: { text: string; from: string; to: strin
 }
 
 async function handleTranslatePageBatch(data: { texts: string[]; from: string; to: string }): Promise<{ translations: string[] }> {
+  // Primary: Google Translate (fast)
   try {
     const translations = await googleTranslateBatch(data.texts, data.from, data.to);
     return { translations };
   } catch (err) {
-    console.error("[WA] Batch translate failed:", err);
+    console.warn("[WA] Google Translate batch failed, falling back to AI:", err);
+  }
+
+  // Fallback: AI batch translation
+  try {
+    const translations = await handleAITranslateBatch(data);
+    return { translations };
+  } catch (err) {
+    console.error("[WA] AI batch translate also failed:", err);
+    try { chrome.runtime.sendMessage({ type: "translate:page-error" }); } catch { /* ignore */ }
     return { translations: data.texts.map(() => "") };
   }
+}
+
+async function handleAITranslateBatch(data: { texts: string[]; from: string; to: string }): Promise<string[]> {
+  const settings = await getAISettings();
+  const provider = providerRegistry.get(settings.activeProvider);
+  const config = await getProviderConfig(settings.activeProvider);
+
+  if (!provider || !config.apiKey) {
+    throw new Error("No AI provider configured");
+  }
+
+  const targetLang = LANG_NAMES[data.to] || data.to;
+  const translations: string[] = new Array(data.texts.length).fill("");
+
+  // Process in small chunks to avoid API overload (529)
+  const chunkSize = 3;
+  for (let i = 0; i < data.texts.length; i += chunkSize) {
+    const chunk = data.texts.slice(i, i + chunkSize);
+    const result = await aiTranslateChunkWithRetry(provider, config, settings.activeModel, chunk, targetLang);
+    for (let j = 0; j < result.length; j++) {
+      translations[i + j] = result[j];
+    }
+  }
+
+  return translations;
+}
+
+async function aiTranslateChunkWithRetry(
+  provider: ReturnType<typeof providerRegistry.get>,
+  config: Awaited<ReturnType<typeof getProviderConfig>>,
+  model: string,
+  texts: string[],
+  targetLang: string,
+  maxRetries = 3,
+): Promise<string[]> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await aiTranslateChunk(provider!, config, model, texts, targetLang);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // Retry on 429/529 (rate limit/overloaded) with exponential backoff
+      if ((msg.includes("529") || msg.includes("429")) && attempt < maxRetries) {
+        await new Promise((r) => setTimeout(r, 3000 * (attempt + 1)));
+        continue;
+      }
+      throw err;
+    }
+  }
+  return texts.map(() => "");
+}
+
+async function aiTranslateChunk(
+  provider: NonNullable<ReturnType<typeof providerRegistry.get>>,
+  config: Awaited<ReturnType<typeof getProviderConfig>>,
+  model: string,
+  texts: string[],
+  targetLang: string,
+): Promise<string[]> {
+  const numbered = texts.map((t, i) => `${i + 1}. ${t}`).join("\n");
+  const prompt = `Translate each numbered line below to ${targetLang}. Return ONLY the translations, one per line, with the same number prefix. Do not add explanations.\n\n${numbered}`;
+
+  let result = "";
+  const stream = provider.chat(
+    { model, messages: [{ role: "user", content: prompt }], temperature: 0.3, timeout: 60000 },
+    config,
+  );
+  for await (const chunk of stream) {
+    if (chunk.type === "text" && chunk.content) result += chunk.content;
+    if (chunk.type === "error") throw new Error(chunk.error || "AI error");
+  }
+
+  const lines = result.trim().split("\n");
+  const translations: string[] = new Array(texts.length).fill("");
+  for (const line of lines) {
+    const match = line.match(/^(\d+)\.\s*(.+)/);
+    if (match) {
+      const idx = parseInt(match[1], 10) - 1;
+      if (idx >= 0 && idx < texts.length) {
+        translations[idx] = match[2].trim();
+      }
+    }
+  }
+  return translations;
 }
 
 async function handleAITranslate(data: { text: string; from: string; to: string }): Promise<{ translated: string }> {

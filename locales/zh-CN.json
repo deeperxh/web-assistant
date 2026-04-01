@@ -125,6 +125,7 @@
   "settings.tempBalanced": "平衡",
   "settings.tempCreative": "创意",
   "translation.refreshPage": "请先刷新页面",
+  "translation.translateFailed": "翻译失败，请检查 AI 服务配置",
   "aria.chatInput": "消息输入框",
   "aria.deleteConversation": "删除对话",
   "aria.dismissContext": "关闭引用",

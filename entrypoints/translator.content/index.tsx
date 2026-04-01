@@ -6,6 +6,7 @@ export default defineContentScript({
     let hoverTooltip: HTMLElement | null = null;
     let hoverTimeout: ReturnType<typeof setTimeout> | null = null;
     let isPageTranslated = false;
+    let isTranslating = false;
     const translatedNodes: HTMLElement[] = [];
 
     // LRU cache with max 500 entries
@@ -229,6 +230,14 @@ export default defineContentScript({
       }
     }
 
+    /** Check if an element is visible (skip display:none, visibility:hidden, zero-size) */
+    function isElementVisible(el: HTMLElement): boolean {
+      if (el.offsetWidth === 0 && el.offsetHeight === 0 && el.getClientRects().length === 0) return false;
+      const style = getComputedStyle(el);
+      if (style.display === "none" || style.visibility === "hidden") return false;
+      return true;
+    }
+
     function collectTextBlocks(root?: HTMLElement): TextBlock[] {
       const blocks: TextBlock[] = [];
       const seen = new Set<HTMLElement>();
@@ -248,6 +257,7 @@ export default defineContentScript({
         const el = node as HTMLElement;
         if (!BLOCK_TAGS.has(el.tagName)) continue;
         if (seen.has(el)) continue;
+        if (!isElementVisible(el)) continue;
 
         // Priority 1: Headings — always translate as a single unit
         if (HEADING_TAGS.has(el.tagName)) {
@@ -290,6 +300,8 @@ export default defineContentScript({
     }
 
     async function translatePage(targetLang: string) {
+      if (isTranslating) return;
+      isTranslating = true;
       if (isPageTranslated) restorePage();
 
       // GitHub/GitLab: only translate README section
@@ -297,6 +309,7 @@ export default defineContentScript({
       if (isGitHubOrGitLab()) {
         const readmeEl = findReadmeRoot();
         if (!readmeEl) {
+          isTranslating = false;
           try { chrome.runtime.sendMessage({ type: "translate:page-done" }); } catch { /* ignore */ }
           return;
         }
@@ -305,6 +318,7 @@ export default defineContentScript({
 
       const blocks = collectTextBlocks(root);
       if (blocks.length === 0) {
+        isTranslating = false;
         try {
           chrome.runtime.sendMessage({ type: "translate:page-done" });
         } catch { /* ignore */ }
@@ -391,12 +405,14 @@ export default defineContentScript({
         reportProgress();
       }
 
-      isPageTranslated = true;
-
-      // Report done
-      try {
-        chrome.runtime.sendMessage({ type: "translate:page-done" });
-      } catch { /* ignore */ }
+      // Only mark as translated if we actually inserted any translations
+      isTranslating = false;
+      if (translatedNodes.length > 0) {
+        isPageTranslated = true;
+        try { chrome.runtime.sendMessage({ type: "translate:page-done" }); } catch { /* ignore */ }
+      } else {
+        try { chrome.runtime.sendMessage({ type: "translate:page-error" }); } catch { /* ignore */ }
+      }
     }
 
     function restorePage() {

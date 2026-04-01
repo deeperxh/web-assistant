@@ -125,6 +125,7 @@
   "settings.tempBalanced": "Balanced",
   "settings.tempCreative": "Creative",
   "translation.refreshPage": "Please refresh the page first",
+  "translation.translateFailed": "Translation failed, please check AI settings",
   "aria.chatInput": "Message input",
   "aria.deleteConversation": "Delete conversation",
   "aria.dismissContext": "Dismiss quote",

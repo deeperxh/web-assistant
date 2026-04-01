@@ -57,6 +57,7 @@ async function translateChunk(text: string, sl: string, tl: string): Promise<str
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ q: text }),
+    signal: AbortSignal.timeout(5000),
   });
   if (!resp.ok) {
     throw new Error(`Google Translate HTTP ${resp.status}`);

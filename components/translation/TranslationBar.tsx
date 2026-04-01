@@ -13,6 +13,10 @@ export function TranslationBar() {
     const handler = (message: any) => {
       if (message.type === "translate:page-progress") {
         setProgress(message.data);
+      } else if (message.type === "translate:page-error") {
+        setError(t("translation.translateFailed"));
+        setTranslating(false);
+        setProgress(null);
       } else if (message.type === "translate:page-done") {
         setTranslating(false);
         setTranslated(true);
@@ -65,20 +69,35 @@ export function TranslationBar() {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab?.id) { setTranslating(false); return; }
 
-    chrome.tabs.sendMessage(tab.id, {
-      type: "translate:page-start",
-      data: { targetLang },
-    }, () => {
-      if (chrome.runtime.lastError) {
-        const msg = chrome.runtime.lastError.message || "";
-        if (msg.includes("Receiving end does not exist") || msg.includes("Could not establish connection")) {
-          setError(t("translation.refreshPage"));
-        } else {
-          setError(msg || t("settings.requestFailed"));
-        }
+    const trySend = (tabId: number): Promise<boolean> =>
+      new Promise((resolve) => {
+        chrome.tabs.sendMessage(tabId, {
+          type: "translate:page-start",
+          data: { targetLang },
+        }, () => {
+          resolve(!chrome.runtime.lastError);
+        });
+      });
+
+    let ok = await trySend(tab.id);
+
+    if (!ok) {
+      // Content script stale (extension updated) — re-inject and retry
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ["content-scripts/translator.js"],
+        });
+        await new Promise((r) => setTimeout(r, 100));
+        ok = await trySend(tab.id);
+      } catch {
+        // executeScript failed (e.g. chrome:// pages)
+      }
+      if (!ok) {
+        setError(t("translation.refreshPage"));
         setTranslating(false);
       }
-    });
+    }
   }, []);
 
   const handleRestore = useCallback(async () => {
@@ -111,7 +130,7 @@ export function TranslationBar() {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+    <div style={{ position: "relative" }}>
       <button
         onClick={handleTranslate}
         disabled={translating}
@@ -119,8 +138,8 @@ export function TranslationBar() {
         style={{
           display: "flex", alignItems: "center", gap: 6,
           padding: "6px 12px", borderRadius: 10,
-          border: "1px solid var(--border-default)",
-          background: "transparent", color: "var(--text-body)",
+          border: `1px solid ${error ? "var(--red)" : "var(--border-default)"}`,
+          background: "transparent", color: error ? "var(--red)" : "var(--text-body)",
           fontSize: 12, fontWeight: 600, cursor: translating ? "not-allowed" : "pointer",
           opacity: translating ? 0.7 : 1,
           transition: "all 0.15s",
@@ -134,13 +153,10 @@ export function TranslationBar() {
         ) : (
           <>
             <Languages size={14} />
-            {t("translation.translatePage")}
+            {error || t("translation.translatePage")}
           </>
         )}
       </button>
-      {error && (
-        <span role="alert" style={{ fontSize: 11, color: "var(--red)" }}>{error}</span>
-      )}
     </div>
   );
 }
