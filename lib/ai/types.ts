@@ -15,6 +15,7 @@ export interface ChatMessage {
   content: string;
   context?: SelectionContext;
   timestamp: number;
+  toolCalls?: { name: string; input: Record<string, unknown> }[];
 }
 
 export interface SelectionContext {
@@ -29,23 +30,57 @@ export interface PageContext {
   content: string;
 }
 
+// --- Tool Use Types ---
+
+export interface ToolDefinition {
+  name: string;
+  description: string;
+  input_schema: Record<string, unknown>;
+}
+
+export interface TextBlock {
+  type: "text";
+  text: string;
+}
+
+export interface ToolUseBlock {
+  type: "tool_use";
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+}
+
+export interface ToolResultBlock {
+  type: "tool_result";
+  tool_use_id: string;
+  content: string;
+}
+
+export type ContentBlock = TextBlock | ToolUseBlock | ToolResultBlock;
+
 export interface ChatParams {
   model: string;
-  messages: { role: string; content: string }[];
+  messages: { role: string; content: string | ContentBlock[] }[];
   temperature?: number;
   maxTokens?: number;
   signal?: AbortSignal;
+  tools?: ToolDefinition[];
 }
 
 export interface ChatChunk {
-  type: "text" | "error" | "done";
+  type: "text" | "error" | "done" | "tool_call" | "tool_status";
   content?: string;
   error?: string;
+  toolCallId?: string;
+  toolName?: string;
+  toolInput?: Record<string, unknown>;
+  toolState?: "running" | "completed" | "failed";
 }
 
 export interface AIProvider {
   readonly id: string;
   readonly name: string;
+  readonly format: "anthropic" | "openai";
   readonly models: AIModel[];
   chat(params: ChatParams, config: ProviderConfig): AsyncGenerator<ChatChunk>;
 }

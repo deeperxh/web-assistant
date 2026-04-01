@@ -15,6 +15,7 @@ export function useChat() {
     setStreamError,
     setPendingContext,
     newConversation,
+    addToolStatus,
   } = useChatStore();
 
   const portRef = useRef<chrome.runtime.Port | null>(null);
@@ -39,13 +40,29 @@ export function useChat() {
       const { pageContext } = useChatStore.getState();
       const apiMessages: { role: string; content: string }[] = [];
 
+      const systemContent = [
+        "You are a helpful AI web assistant embedded in a browser extension.",
+        "",
+        "You have access to these tools:",
+        "- web_search(query): Search the web for current information",
+        "- fetch_url(url): Fetch and read the content of any web page",
+        "",
+        "Use tools proactively when they would help answer the user's question.",
+        "For example:",
+        "- If the user asks about something you're not sure about, search for it",
+        "- If the user mentions a URL or asks about a specific page, fetch it",
+        "- If you need to verify facts or find up-to-date information, search for them",
+        "",
+        "After using tools, synthesize the results into a clear, helpful response with sources.",
+      ];
+
       if (pageContext) {
-        const systemContent = [
-          "You are a helpful AI web assistant embedded in a browser extension.",
-          "The user is currently viewing:\n",
+        systemContent.push(
+          "",
+          "The user is currently viewing:",
           `URL: ${pageContext.url}`,
           `Title: ${pageContext.title}`,
-        ];
+        );
         if (pageContext.content) {
           systemContent.push(
             "\n--- Page Content ---",
@@ -54,10 +71,12 @@ export function useChat() {
           );
         }
         systemContent.push(
-          "\nUse this page context to answer questions about the page when relevant. If the user's question is not about the page, answer normally.",
+          "",
+          "Use this page context when relevant. If the user asks about a different page, use fetch_url to read it.",
         );
-        apiMessages.push({ role: "system", content: systemContent.join("\n") });
       }
+
+      apiMessages.push({ role: "system", content: systemContent.join("\n") });
 
       apiMessages.push(
         ...conv.messages
@@ -81,6 +100,8 @@ export function useChat() {
       port.onMessage.addListener((msg) => {
         if (msg.type === "text" && msg.content) {
           appendChunk(msg.content);
+        } else if (msg.type === "tool_status") {
+          addToolStatus(msg.toolName, msg.toolInput, msg.toolState);
         } else if (msg.type === "done") {
           finishStreaming();
           cleanup();
@@ -113,7 +134,7 @@ export function useChat() {
         portRef.current = null;
       }
     },
-    [pendingContext, addUserMessage, startStreaming, appendChunk, finishStreaming, setStreamError],
+    [pendingContext, addUserMessage, startStreaming, appendChunk, finishStreaming, setStreamError, addToolStatus],
   );
 
   const cancelStream = useCallback(() => {

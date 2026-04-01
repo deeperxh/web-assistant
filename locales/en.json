@@ -147,5 +147,7 @@
   "aria.cancelPicker": "Cancel picking",
   "aria.resetPicker": "Pick again",
   "aria.descriptionInput": "Change description",
-  "aria.copyPrompt": "Copy to clipboard"
+  "aria.copyPrompt": "Copy to clipboard",
+  "tool.searching": "Searching",
+  "tool.reading": "Reading"
 }

@@ -9,7 +9,7 @@ import { t } from "../../lib/utils/i18n";
 
 export function ChatPanel() {
   const { messages, isStreaming, pendingContext, sendMessage, cancelStream, setPendingContext, newConversation } = useChat();
-  const { conversations, activeConversation, selectConversation, deleteConversation, pageContext } = useChatStore();
+  const { conversations, activeConversation, selectConversation, deleteConversation, pageContext, activeToolStatuses } = useChatStore();
   const [showHistory, setShowHistory] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -127,7 +127,12 @@ export function ChatPanel() {
             </div>
           )}
           {messages.map((msg, i) => (
-            <MessageBubble key={msg.id} message={msg} isStreaming={isStreaming && i === messages.length - 1 && msg.role === "assistant"} />
+            <MessageBubble
+              key={msg.id}
+              message={msg}
+              isStreaming={isStreaming && i === messages.length - 1 && msg.role === "assistant"}
+              toolStatuses={isStreaming && i === messages.length - 1 && msg.role === "assistant" ? activeToolStatuses : undefined}
+            />
           ))}
           <div ref={endRef} />
         </div>

@@ -3,13 +3,14 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { Copy, Check } from "lucide-react";
+import { Copy, Check, Loader2, X, Search, Globe } from "lucide-react";
 import type { ChatMessage } from "../../lib/ai/types";
+import type { ToolStatus } from "../../stores/chat-store";
 import { t } from "../../lib/utils/i18n";
 
-interface Props { message: ChatMessage; isStreaming?: boolean; }
+interface Props { message: ChatMessage; isStreaming?: boolean; toolStatuses?: ToolStatus[]; }
 
-export const MessageBubble = memo(function MessageBubble({ message, isStreaming }: Props) {
+export const MessageBubble = memo(function MessageBubble({ message, isStreaming, toolStatuses }: Props) {
   const isUser = message.role === "user";
 
   if (isUser) {
@@ -46,6 +47,11 @@ export const MessageBubble = memo(function MessageBubble({ message, isStreaming 
           lineHeight: 1.6,
         }}
       >
+        {/* Tool status indicators — live during streaming, from message history otherwise */}
+        <ToolIndicators
+          statuses={isStreaming ? toolStatuses : undefined}
+          toolCalls={!isStreaming ? message.toolCalls : undefined}
+        />
         <div className="md" style={{ wordBreak: "break-word" }}>
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
@@ -77,6 +83,68 @@ export const MessageBubble = memo(function MessageBubble({ message, isStreaming 
     </div>
   );
 });
+
+function ToolIndicators({
+  statuses,
+  toolCalls,
+}: {
+  statuses?: ToolStatus[];
+  toolCalls?: { name: string; input: Record<string, unknown> }[];
+}) {
+  // During streaming: use live statuses; in history: use saved toolCalls (all completed)
+  const items = statuses && statuses.length > 0
+    ? statuses
+    : toolCalls && toolCalls.length > 0
+      ? toolCalls.map((tc) => ({ name: tc.name, input: tc.input, state: "completed" as const }))
+      : null;
+
+  if (!items) return null;
+
+  return (
+    <div style={{ marginBottom: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+      {items.map((s, i) => {
+        const label =
+          s.name === "web_search"
+            ? `${t("tool.searching")}: ${(s.input as { query?: string }).query || ""}`
+            : `${t("tool.reading")}: ${truncateUrl((s.input as { url?: string }).url || "")}`;
+
+        return (
+          <div
+            key={i}
+            className="anim-in"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 12,
+              color: "var(--text-muted)",
+              padding: "3px 0",
+            }}
+          >
+            {s.state === "running" && <Loader2 size={13} style={{ animation: "spin 1s linear infinite", flexShrink: 0 }} />}
+            {s.state === "completed" && (s.name === "web_search"
+              ? <Search size={13} style={{ color: "var(--tint)", flexShrink: 0 }} />
+              : <Globe size={13} style={{ color: "var(--tint)", flexShrink: 0 }} />
+            )}
+            {s.state === "failed" && <X size={13} style={{ color: "var(--red)", flexShrink: 0 }} />}
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function truncateUrl(url: string, max = 50): string {
+  if (url.length <= max) return url;
+  try {
+    const u = new URL(url);
+    const path = u.pathname.length > 30 ? u.pathname.slice(0, 27) + "..." : u.pathname;
+    return u.host + path;
+  } catch {
+    return url.slice(0, max) + "...";
+  }
+}
 
 function CodeBlock({ language, code }: { language: string; code: string }) {
   const [copied, setCopied] = useState(false);

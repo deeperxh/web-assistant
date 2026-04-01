@@ -147,5 +147,7 @@
   "aria.cancelPicker": "取消选取",
   "aria.resetPicker": "重新选取",
   "aria.descriptionInput": "修改描述",
-  "aria.copyPrompt": "复制到剪贴板"
+  "aria.copyPrompt": "复制到剪贴板",
+  "tool.searching": "正在搜索",
+  "tool.reading": "正在阅读"
 }

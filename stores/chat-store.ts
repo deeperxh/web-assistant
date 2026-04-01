@@ -9,12 +9,19 @@ import {
 } from "../lib/storage/conversations-store";
 import { getAISettings } from "../lib/storage/settings-store";
 
+export interface ToolStatus {
+  name: string;
+  input: Record<string, unknown>;
+  state: "running" | "completed" | "failed";
+}
+
 interface ChatState {
   conversations: Conversation[];
   activeConversation: Conversation | null;
   isStreaming: boolean;
   pendingContext: SelectionContext | null;
   pageContext: PageContext | null;
+  activeToolStatuses: ToolStatus[];
 
   // Actions
   loadConversations: () => Promise<void>;
@@ -28,6 +35,7 @@ interface ChatState {
   appendChunk: (content: string) => void;
   finishStreaming: () => void;
   setStreamError: (error: string) => void;
+  addToolStatus: (name: string, input: Record<string, unknown>, state: "running" | "completed" | "failed") => void;
 }
 
 // Chunk buffering: accumulate chunks and flush via rAF to avoid per-chunk re-renders
@@ -68,6 +76,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isStreaming: false,
   pendingContext: null,
   pageContext: null,
+  activeToolStatuses: [],
 
   loadConversations: async () => {
     const conversations = await getConversations();
@@ -208,17 +217,49 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
     }
 
-    const conv = get().activeConversation;
+    let conv = get().activeConversation;
     if (conv) {
+      // Snapshot tool calls into the last assistant message
+      const toolStatuses = get().activeToolStatuses;
+      if (toolStatuses.length > 0) {
+        const msgs = [...conv.messages];
+        const last = msgs[msgs.length - 1];
+        if (last && last.role === "assistant") {
+          msgs[msgs.length - 1] = {
+            ...last,
+            toolCalls: toolStatuses.map((t) => ({ name: t.name, input: t.input })),
+          };
+          conv = { ...conv, messages: msgs };
+        }
+      }
       saveConversation(conv);
     }
-    // Sync conversations list (deferred from chunk updates) and clear streaming flag
+    // Sync conversations list, clear streaming flag and tool statuses
     set((s) => ({
       isStreaming: false,
+      activeConversation: conv,
+      activeToolStatuses: [],
       conversations: s.conversations.map((c) =>
         c.id === conv?.id ? conv : c,
       ),
     }));
+  },
+
+  addToolStatus: (name, input, state) => {
+    set((s) => {
+      const statuses = [...s.activeToolStatuses];
+      const key = JSON.stringify({ name, input });
+      const existing = statuses.findIndex(
+        (t) => JSON.stringify({ name: t.name, input: t.input }) === key,
+      );
+      const entry: ToolStatus = { name, input, state };
+      if (existing >= 0) {
+        statuses[existing] = entry;
+      } else {
+        statuses.push(entry);
+      }
+      return { activeToolStatuses: statuses };
+    });
   },
 
   setStreamError: (error) => {

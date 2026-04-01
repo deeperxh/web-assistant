@@ -4,6 +4,7 @@ import { parseSSEStream } from "./stream-parser";
 export class AnthropicCompatibleProvider implements AIProvider {
   readonly id: string;
   readonly name: string;
+  readonly format = "anthropic" as const;
   readonly models: AIModel[];
   private defaultBaseUrl: string;
 
@@ -35,6 +36,9 @@ export class AnthropicCompatibleProvider implements AIProvider {
     };
     if (systemMsg) {
       body.system = systemMsg.content;
+    }
+    if (params.tools && params.tools.length > 0) {
+      body.tools = params.tools;
     }
 
     // Build URL — smart path detection
@@ -100,18 +104,34 @@ export class AnthropicCompatibleProvider implements AIProvider {
 
     const reader = response.body!.pipeThrough(new TextDecoderStream()).getReader();
 
+    // State for tracking tool use blocks
+    let currentToolId = "";
+    let currentToolName = "";
+    let toolInputJson = "";
+    let stopReason = "";
+
     for await (const parsed of parseSSEStream(reader)) {
       const event = parsed as {
         type: string;
         index?: number;
-        delta?: { type?: string; text?: string; thinking?: string };
-        content_block?: { type?: string };
+        delta?: { type?: string; text?: string; thinking?: string; partial_json?: string; stop_reason?: string };
+        content_block?: { type?: string; id?: string; name?: string };
       };
 
+      if (event.type === "content_block_start") {
+        if (event.content_block?.type === "tool_use") {
+          currentToolId = event.content_block.id || "";
+          currentToolName = event.content_block.name || "";
+          toolInputJson = "";
+        }
+      }
+
       if (event.type === "content_block_delta") {
-        // Handle text delta (normal response)
         if (event.delta?.type === "text_delta" && event.delta.text) {
           yield { type: "text", content: event.delta.text };
+        }
+        else if (event.delta?.type === "input_json_delta" && event.delta.partial_json) {
+          toolInputJson += event.delta.partial_json;
         }
         // Also handle bare .text (some providers)
         else if (event.delta?.text && !event.delta?.type) {
@@ -119,9 +139,22 @@ export class AnthropicCompatibleProvider implements AIProvider {
         }
         // Skip thinking_delta, signature_delta silently
       }
+
+      if (event.type === "content_block_stop" && currentToolId) {
+        let input: Record<string, unknown> = {};
+        try { input = toolInputJson ? JSON.parse(toolInputJson) : {}; } catch { /* empty */ }
+        yield { type: "tool_call", toolCallId: currentToolId, toolName: currentToolName, toolInput: input };
+        currentToolId = "";
+        currentToolName = "";
+        toolInputJson = "";
+      }
+
+      if (event.type === "message_delta") {
+        stopReason = event.delta?.stop_reason || stopReason;
+      }
     }
 
-    yield { type: "done" };
+    yield { type: "done", content: stopReason };
   }
 }
 

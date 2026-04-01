@@ -8,6 +8,7 @@ import { parseSSEStream } from "./stream-parser";
 export class OpenAICompatibleProvider implements AIProvider {
   readonly id: string;
   readonly name: string;
+  readonly format = "openai" as const;
   readonly models: AIModel[];
   private defaultBaseUrl: string;
   private extraHeaders: Record<string, string>;
@@ -50,6 +51,18 @@ export class OpenAICompatibleProvider implements AIProvider {
           temperature: params.temperature ?? 0.7,
           max_tokens: params.maxTokens,
           stream: true,
+          ...(params.tools && params.tools.length > 0
+            ? {
+                tools: params.tools.map((t) => ({
+                  type: "function",
+                  function: {
+                    name: t.name,
+                    description: t.description,
+                    parameters: t.input_schema,
+                  },
+                })),
+              }
+            : {}),
         }),
         signal,
       });
@@ -85,15 +98,51 @@ export class OpenAICompatibleProvider implements AIProvider {
 
     const reader = response.body!.pipeThrough(new TextDecoderStream()).getReader();
 
+    // State for tracking tool calls
+    const toolCalls = new Map<number, { id: string; name: string; args: string }>();
+    let finishReason = "";
+
     for await (const parsed of parseSSEStream(reader)) {
-      const obj = parsed as { choices?: { delta?: { content?: string } }[] };
-      const content = obj.choices?.[0]?.delta?.content;
-      if (content) {
-        yield { type: "text", content };
+      const obj = parsed as {
+        choices?: {
+          delta?: {
+            content?: string;
+            tool_calls?: { index: number; id?: string; function?: { name?: string; arguments?: string } }[];
+          };
+          finish_reason?: string;
+        }[];
+      };
+
+      const delta = obj.choices?.[0]?.delta;
+      const fr = obj.choices?.[0]?.finish_reason;
+      if (fr) finishReason = fr;
+
+      if (delta?.content) {
+        yield { type: "text", content: delta.content };
+      }
+
+      if (delta?.tool_calls) {
+        for (const tc of delta.tool_calls) {
+          if (!toolCalls.has(tc.index)) {
+            toolCalls.set(tc.index, { id: tc.id || "", name: tc.function?.name || "", args: "" });
+          }
+          const entry = toolCalls.get(tc.index)!;
+          if (tc.id) entry.id = tc.id;
+          if (tc.function?.name) entry.name = tc.function.name;
+          if (tc.function?.arguments) entry.args += tc.function.arguments;
+        }
       }
     }
 
-    yield { type: "done" };
+    // Emit accumulated tool calls
+    for (const [, tc] of toolCalls) {
+      let input: Record<string, unknown> = {};
+      try { input = tc.args ? JSON.parse(tc.args) : {}; } catch { /* empty */ }
+      yield { type: "tool_call", toolCallId: tc.id, toolName: tc.name, toolInput: input };
+    }
+
+    const stopReason = finishReason === "tool_calls" ? "tool_use" : finishReason;
+    yield { type: "done", content: stopReason };
   }
 }
 
